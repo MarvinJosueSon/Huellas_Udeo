@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 
 from modulos.alumnos import Alumnos
 from modulos.docentes import Docentes
@@ -64,6 +65,75 @@ class MenuPrincipal(tk.Frame):
         )
 
 
+        self.scroll_sidebar = ttk.Scrollbar(
+            self.sidebar,
+            orient="vertical"
+        )
+
+        self.scroll_sidebar.pack(
+            side="right",
+            fill="y"
+        )
+
+
+        self.canvas_sidebar = tk.Canvas(
+            self.sidebar,
+            bg="#202020",
+            highlightthickness=0,
+            bd=0,
+            yscrollcommand=self.scroll_sidebar.set
+        )
+
+        self.canvas_sidebar.pack(
+            side="left",
+            fill="both",
+            expand=True
+        )
+
+
+        self.scroll_sidebar.config(
+            command=self.canvas_sidebar.yview
+        )
+
+
+        self.menu_contenido = tk.Frame(
+            self.canvas_sidebar,
+            bg="#202020"
+        )
+
+
+        self.ventana_menu = (
+            self.canvas_sidebar.create_window(
+                (0, 0),
+                window=self.menu_contenido,
+                anchor="nw"
+            )
+        )
+
+
+        self.menu_contenido.bind(
+            "<Configure>",
+            self.actualizar_region_scroll
+        )
+
+
+        self.canvas_sidebar.bind(
+            "<Configure>",
+            self.ajustar_ancho_menu
+        )
+
+
+        self.canvas_sidebar.bind(
+            "<MouseWheel>",
+            self.desplazar_menu
+        )
+
+        self.menu_contenido.bind(
+            "<MouseWheel>",
+            self.desplazar_menu
+        )
+
+
         self.contenido = tk.Frame(
             self,
             bg="#F3F3F3"
@@ -77,7 +147,7 @@ class MenuPrincipal(tk.Frame):
 
 
         tk.Label(
-            self.sidebar,
+            self.menu_contenido,
             text="UDEO",
             bg="#202020",
             fg="#FFFFFF",
@@ -90,7 +160,7 @@ class MenuPrincipal(tk.Frame):
 
 
         tk.Label(
-            self.sidebar,
+            self.menu_contenido,
             text="Assistance Digital",
             bg="#202020",
             fg="#BFBFBF",
@@ -103,7 +173,7 @@ class MenuPrincipal(tk.Frame):
 
 
         tk.Label(
-            self.sidebar,
+            self.menu_contenido,
             text=self.sesion.usuario,
             bg="#202020",
             fg="#FFFFFF",
@@ -115,7 +185,7 @@ class MenuPrincipal(tk.Frame):
 
 
         tk.Label(
-            self.sidebar,
+            self.menu_contenido,
             text=self.sesion.rol,
             bg="#202020",
             fg="#AFAFAF",
@@ -143,16 +213,16 @@ class MenuPrincipal(tk.Frame):
 
 
         tk.Frame(
-            self.sidebar,
-            bg="#202020"
+            self.menu_contenido,
+            bg="#202020",
+            height=20
         ).pack(
-            fill="both",
-            expand=True
+            fill="x"
         )
 
 
         tk.Button(
-            self.sidebar,
+            self.menu_contenido,
             text="Cerrar sesión",
             bg="#202020",
             fg="#FFFFFF",
@@ -167,8 +237,68 @@ class MenuPrincipal(tk.Frame):
         ).pack(
             fill="x",
             padx=10,
-            pady=15,
+            pady=(10, 20),
             ipady=8
+        )
+
+
+        self.after(
+            100,
+            self.actualizar_scroll
+        )
+
+
+    def actualizar_region_scroll(
+        self,
+        event=None
+    ):
+
+        self.canvas_sidebar.configure(
+            scrollregion=self.canvas_sidebar.bbox(
+                "all"
+            )
+        )
+
+
+    def ajustar_ancho_menu(
+        self,
+        event
+    ):
+
+        self.canvas_sidebar.itemconfigure(
+            self.ventana_menu,
+            width=event.width
+        )
+
+
+    def actualizar_scroll(self):
+
+        self.update_idletasks()
+
+        self.canvas_sidebar.configure(
+            scrollregion=self.canvas_sidebar.bbox(
+                "all"
+            )
+        )
+
+
+    def desplazar_menu(
+        self,
+        event
+    ):
+
+        if event.delta == 0:
+            return
+
+        pasos = int(
+            -1 * (
+                event.delta / 120
+            )
+        )
+
+        self.canvas_sidebar.yview_scroll(
+            pasos,
+            "units"
         )
 
 
@@ -313,7 +443,7 @@ class MenuPrincipal(tk.Frame):
     ):
 
         boton = tk.Button(
-            self.sidebar,
+            self.menu_contenido,
             text=texto,
             bg="#202020",
             fg="#FFFFFF",
@@ -347,7 +477,6 @@ class MenuPrincipal(tk.Frame):
     def mostrar_inicio(self):
 
         self.limpiar_contenido()
-
 
         contenedor = tk.Frame(
             self.contenido,
@@ -596,7 +725,6 @@ class MenuPrincipal(tk.Frame):
     ):
 
         self.limpiar_contenido()
-
 
         contenedor = tk.Frame(
             self.contenido,

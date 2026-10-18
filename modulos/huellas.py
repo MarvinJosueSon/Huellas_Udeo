@@ -1,5 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+import threading
+
+from sensor_huellas import SensorHuellas
 
 
 class Huellas(tk.Frame):
@@ -16,9 +19,14 @@ class Huellas(tk.Frame):
 
         self.database = database
 
+        self.sensor = (
+            SensorHuellas()
+        )
+
         self.datos_huellas = []
-        self.datos_alumnos = []
         self.mapa_alumnos = {}
+
+        self.capturando = False
 
         self.pack(
             fill="both",
@@ -28,7 +36,6 @@ class Huellas(tk.Frame):
         self.crear_interfaz()
         self.cargar_alumnos()
         self.cargar_huellas()
-        self.nueva()
 
 
     def crear_interfaz(self):
@@ -65,13 +72,13 @@ class Huellas(tk.Frame):
             activeforeground="#FFFFFF",
             relief="flat",
             bd=0,
-            font=("Segoe UI", 10, "bold"),
             cursor="hand2",
-            command=self.nueva
+            font=("Segoe UI", 10, "bold"),
+            command=self.nueva_huella
         ).pack(
             side="right",
-            ipadx=15,
-            ipady=6
+            ipadx=14,
+            ipady=7
         )
 
 
@@ -92,7 +99,7 @@ class Huellas(tk.Frame):
             text="Buscar:",
             bg="#F3F3F3",
             fg="#202020",
-            font=("Segoe UI", 10)
+            font=("Segoe UI", 9)
         ).pack(
             side="left"
         )
@@ -100,12 +107,12 @@ class Huellas(tk.Frame):
 
         self.txt_buscar = ttk.Entry(
             panel_filtros,
-            width=35
+            width=30
         )
 
         self.txt_buscar.pack(
             side="left",
-            padx=(8, 20)
+            padx=(8, 25)
         )
 
         self.txt_buscar.bind(
@@ -119,7 +126,7 @@ class Huellas(tk.Frame):
             text="Estado:",
             bg="#F3F3F3",
             fg="#202020",
-            font=("Segoe UI", 10)
+            font=("Segoe UI", 9)
         ).pack(
             side="left"
         )
@@ -159,8 +166,7 @@ class Huellas(tk.Frame):
         cuerpo.pack(
             fill="both",
             expand=True,
-            padx=30,
-            pady=(0, 15)
+            padx=30
         )
 
 
@@ -174,17 +180,12 @@ class Huellas(tk.Frame):
             weight=1
         )
 
-        cuerpo.grid_columnconfigure(
-            1,
-            weight=0
-        )
-
 
         panel_tabla = tk.Frame(
             cuerpo,
             bg="#FFFFFF",
             highlightthickness=1,
-            highlightbackground="#DDDDDD"
+            highlightbackground="#A0A0A0"
         )
 
         panel_tabla.grid(
@@ -264,7 +265,8 @@ class Huellas(tk.Frame):
 
         self.tabla.column(
             "codigo",
-            width=110
+            width=110,
+            anchor="center"
         )
 
         self.tabla.column(
@@ -274,7 +276,8 @@ class Huellas(tk.Frame):
 
         self.tabla.column(
             "dedo",
-            width=130
+            width=120,
+            anchor="center"
         )
 
         self.tabla.column(
@@ -340,27 +343,27 @@ class Huellas(tk.Frame):
         )
 
 
-        panel_formulario = tk.Frame(
+        self.panel_formulario = tk.Frame(
             cuerpo,
             bg="#FFFFFF",
-            width=360,
+            width=290,
             highlightthickness=1,
-            highlightbackground="#DDDDDD"
+            highlightbackground="#A0A0A0"
         )
 
-        panel_formulario.grid(
+        self.panel_formulario.grid(
             row=0,
             column=1,
             sticky="ns"
         )
 
-        panel_formulario.grid_propagate(
+        self.panel_formulario.grid_propagate(
             False
         )
 
 
         tk.Label(
-            panel_formulario,
+            self.panel_formulario,
             text="Registrar huella",
             bg="#FFFFFF",
             fg="#202020",
@@ -368,116 +371,170 @@ class Huellas(tk.Frame):
         ).pack(
             anchor="w",
             padx=20,
-            pady=(20, 20)
+            pady=(28, 25)
         )
 
 
-        self.crear_etiqueta(
-            panel_formulario,
-            "Alumno"
+        tk.Label(
+            self.panel_formulario,
+            text="Alumno",
+            bg="#FFFFFF",
+            fg="#202020",
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w",
+            padx=20
         )
 
 
         self.cmb_alumno = ttk.Combobox(
-            panel_formulario,
+            self.panel_formulario,
             state="readonly"
         )
 
         self.cmb_alumno.pack(
             fill="x",
             padx=20,
-            pady=(0, 15)
-        )
-
-
-        self.crear_etiqueta(
-            panel_formulario,
-            "ID del template"
-        )
-
-
-        self.txt_template = ttk.Entry(
-            panel_formulario
-        )
-
-        self.txt_template.pack(
-            fill="x",
-            padx=20,
-            pady=(0, 15)
-        )
-
-
-        self.crear_etiqueta(
-            panel_formulario,
-            "Dedo registrado"
-        )
-
-
-        self.txt_dedo = ttk.Entry(
-            panel_formulario
-        )
-
-        self.txt_dedo.pack(
-            fill="x",
-            padx=20,
-            pady=(0, 15)
+            pady=(5, 20)
         )
 
 
         tk.Label(
-            panel_formulario,
+            self.panel_formulario,
+            text="Dedo registrado",
+            bg="#FFFFFF",
+            fg="#202020",
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w",
+            padx=20
+        )
+
+
+        self.cmb_dedo = ttk.Combobox(
+            self.panel_formulario,
+            state="readonly",
+            values=(
+                "Pulgar derecho",
+                "Índice derecho",
+                "Medio derecho",
+                "Anular derecho",
+                "Meñique derecho",
+                "Pulgar izquierdo",
+                "Índice izquierdo",
+                "Medio izquierdo",
+                "Anular izquierdo",
+                "Meñique izquierdo"
+            )
+        )
+
+        self.cmb_dedo.pack(
+            fill="x",
+            padx=20,
+            pady=(5, 20)
+        )
+
+
+        tk.Label(
+            self.panel_formulario,
+            text="Template asignado por el sensor",
+            bg="#FFFFFF",
+            fg="#202020",
+            font=("Segoe UI", 9)
+        ).pack(
+            anchor="w",
+            padx=20
+        )
+
+
+        self.lbl_template = tk.Label(
+            self.panel_formulario,
+            text="—",
+            bg="#FFFFFF",
+            fg="#0078D4",
+            font=("Segoe UI", 14, "bold")
+        )
+
+        self.lbl_template.pack(
+            anchor="w",
+            padx=20,
+            pady=(5, 15)
+        )
+
+
+        tk.Label(
+            self.panel_formulario,
             text=(
-                "El ID del template corresponde "
-                "al identificador almacenado por "
-                "el sensor de huella."
+                "El template se obtiene "
+                "automáticamente del sensor. "
+                "No necesitas escribir ningún ID."
             ),
             bg="#FFFFFF",
             fg="#666666",
+            wraplength=240,
             justify="left",
-            wraplength=310,
             font=("Segoe UI", 9)
         ).pack(
             anchor="w",
             padx=20,
-            pady=(0, 20)
+            pady=(0, 15)
         )
 
 
-        tk.Button(
-            panel_formulario,
-            text="Guardar huella",
+        self.lbl_estado_sensor = tk.Label(
+            self.panel_formulario,
+            text="Sensor listo para conectar",
+            bg="#FFFFFF",
+            fg="#555555",
+            wraplength=240,
+            justify="left",
+            font=("Segoe UI", 9)
+        )
+
+        self.lbl_estado_sensor.pack(
+            anchor="w",
+            padx=20,
+            pady=(0, 15)
+        )
+
+
+        self.btn_capturar = tk.Button(
+            self.panel_formulario,
+            text="Capturar y guardar huella",
             bg="#0078D4",
             fg="#FFFFFF",
             activebackground="#106EBE",
             activeforeground="#FFFFFF",
             relief="flat",
             bd=0,
-            font=("Segoe UI", 10, "bold"),
             cursor="hand2",
-            command=self.guardar
-        ).pack(
+            font=("Segoe UI", 10, "bold"),
+            command=self.capturar_huella
+        )
+
+        self.btn_capturar.pack(
             fill="x",
             padx=20,
-            pady=(0, 8),
-            ipady=6
+            ipady=7
         )
 
 
         tk.Button(
-            panel_formulario,
+            self.panel_formulario,
             text="Cancelar",
             bg="#E5E5E5",
             fg="#202020",
             activebackground="#D5D5D5",
             relief="flat",
             bd=0,
-            font=("Segoe UI", 10),
             cursor="hand2",
-            command=self.nueva
+            font=("Segoe UI", 9),
+            command=self.nueva_huella
         ).pack(
             fill="x",
             padx=20,
-            ipady=5
+            pady=(8, 0),
+            ipady=6
         )
 
 
@@ -489,7 +546,7 @@ class Huellas(tk.Frame):
         panel_acciones.pack(
             fill="x",
             padx=30,
-            pady=(0, 20)
+            pady=(15, 20)
         )
 
 
@@ -501,12 +558,12 @@ class Huellas(tk.Frame):
             activebackground="#D5D5D5",
             relief="flat",
             bd=0,
-            font=("Segoe UI", 10),
             cursor="hand2",
-            command=self.desactivar
+            font=("Segoe UI", 9),
+            command=self.desactivar_huella
         ).pack(
             side="left",
-            ipadx=15,
+            ipadx=12,
             ipady=5
         )
 
@@ -519,41 +576,21 @@ class Huellas(tk.Frame):
             activebackground="#D5D5D5",
             relief="flat",
             bd=0,
-            font=("Segoe UI", 10),
             cursor="hand2",
+            font=("Segoe UI", 9),
             command=self.actualizar
         ).pack(
             side="left",
-            padx=10,
-            ipadx=15,
+            padx=8,
+            ipadx=12,
             ipady=5
-        )
-
-
-    def crear_etiqueta(
-        self,
-        padre,
-        texto
-    ):
-
-        tk.Label(
-            padre,
-            text=texto,
-            bg="#FFFFFF",
-            fg="#202020",
-            font=("Segoe UI", 9)
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(0, 5)
         )
 
 
     def cargar_alumnos(self):
 
         resultados = (
-            self.database
-            .consultar(
+            self.database.consultar(
                 """
                 SELECT
                     id,
@@ -568,34 +605,12 @@ class Huellas(tk.Frame):
         )
 
 
-        if (
-            not resultados
-            and self.database.obtener_ultimo_error()
-        ):
-
-            messagebox.showerror(
-                "Huellas",
-                (
-                    "No se pudieron cargar "
-                    "los alumnos.\n\n"
-                    + str(
-                        self.database
-                        .obtener_ultimo_error()
-                    )
-                )
-            )
-
-            return
-
-
-        self.datos_alumnos = resultados
-
         valores = []
 
         self.mapa_alumnos = {}
 
 
-        for alumno in self.datos_alumnos:
+        for alumno in resultados:
 
             texto = (
                 f"{alumno['codigo']} - "
@@ -617,11 +632,23 @@ class Huellas(tk.Frame):
         ] = valores
 
 
+        if valores:
+
+            self.cmb_alumno.current(
+                0
+            )
+
+        else:
+
+            self.cmb_alumno.set(
+                ""
+            )
+
+
     def cargar_huellas(self):
 
         resultados = (
-            self.database
-            .consultar(
+            self.database.consultar(
                 """
                 SELECT
                     h.id,
@@ -644,27 +671,9 @@ class Huellas(tk.Frame):
         )
 
 
-        if (
-            not resultados
-            and self.database.obtener_ultimo_error()
-        ):
-
-            messagebox.showerror(
-                "Huellas",
-                (
-                    "No se pudieron cargar "
-                    "las huellas.\n\n"
-                    + str(
-                        self.database
-                        .obtener_ultimo_error()
-                    )
-                )
-            )
-
-            return
-
-
-        self.datos_huellas = resultados
+        self.datos_huellas = (
+            resultados
+        )
 
 
         self.mostrar_datos(
@@ -688,10 +697,32 @@ class Huellas(tk.Frame):
 
         for huella in datos:
 
-            nombre_alumno = (
-                f"{huella['nombre']} "
-                f"{huella['apellido']}"
+            fecha = (
+                huella[
+                    "fecha_registro"
+                ]
             )
+
+
+            if fecha is None:
+
+                fecha_texto = ""
+
+            else:
+
+                try:
+
+                    fecha_texto = (
+                        fecha.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                    )
+
+                except AttributeError:
+
+                    fecha_texto = str(
+                        fecha
+                    )
 
 
             self.tabla.insert(
@@ -701,36 +732,14 @@ class Huellas(tk.Frame):
                     huella["id"],
                     huella["id_template"],
                     huella["codigo"],
-                    nombre_alumno,
-                    huella["dedo"],
-                    self.formatear_fecha(
-                        huella["fecha_registro"]
+                    (
+                        f"{huella['nombre']} "
+                        f"{huella['apellido']}"
                     ),
+                    huella["dedo"],
+                    fecha_texto,
                     huella["estado"]
                 )
-            )
-
-
-    def formatear_fecha(
-        self,
-        fecha
-    ):
-
-        if fecha is None:
-
-            return ""
-
-
-        try:
-
-            return fecha.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-
-        except AttributeError:
-
-            return str(
-                fecha
             )
 
 
@@ -746,6 +755,7 @@ class Huellas(tk.Frame):
             .lower()
         )
 
+
         estado = (
             self.cmb_estado
             .get()
@@ -755,42 +765,30 @@ class Huellas(tk.Frame):
         filtradas = []
 
 
-        for huella in self.datos_huellas:
+        for huella in (
+            self.datos_huellas
+        ):
 
-            template = str(
-                huella["id_template"]
-            ).lower()
-
-            codigo = str(
-                huella["codigo"]
-            ).lower()
-
-            nombre = str(
-                huella["nombre"]
-            ).lower()
-
-            apellido = str(
-                huella["apellido"]
-            ).lower()
-
-            dedo = str(
-                huella["dedo"]
+            contenido = (
+                f"{huella['id_template']} "
+                f"{huella['codigo']} "
+                f"{huella['nombre']} "
+                f"{huella['apellido']} "
+                f"{huella['dedo']}"
             ).lower()
 
 
             coincide_texto = (
                 texto == ""
-                or texto in template
-                or texto in codigo
-                or texto in nombre
-                or texto in apellido
-                or texto in dedo
+                or texto in contenido
             )
 
 
             coincide_estado = (
                 estado == "TODAS"
-                or huella["estado"] == estado
+                or huella[
+                    "estado"
+                ] == estado
             )
 
 
@@ -809,38 +807,38 @@ class Huellas(tk.Frame):
         )
 
 
-    def nueva(self):
+    def nueva_huella(self):
 
-        self.cmb_alumno.set(
+        self.lbl_template.config(
+            text="—"
+        )
+
+        self.lbl_estado_sensor.config(
+            text="Sensor listo para conectar"
+        )
+
+
+        self.cmb_dedo.set(
             ""
         )
 
 
-        self.txt_template.delete(
-            0,
-            tk.END
-        )
-
-
-        self.txt_dedo.delete(
-            0,
-            tk.END
-        )
-
-
-        for fila in (
-            self.tabla.selection()
+        if (
+            self.cmb_alumno[
+                "values"
+            ]
         ):
 
-            self.tabla.selection_remove(
-                fila
+            self.cmb_alumno.current(
+                0
             )
 
 
-        self.cmb_alumno.focus_set()
+    def capturar_huella(self):
 
+        if self.capturando:
+            return
 
-    def validar_formulario(self):
 
         alumno_texto = (
             self.cmb_alumno
@@ -859,63 +857,11 @@ class Huellas(tk.Frame):
                 "Selecciona un alumno."
             )
 
-            return None
-
-
-        template_texto = (
-            self.txt_template
-            .get()
-            .strip()
-        )
-
-
-        if template_texto == "":
-
-            messagebox.showwarning(
-                "Huellas",
-                (
-                    "Ingresa el ID "
-                    "del template."
-                )
-            )
-
-            return None
-
-
-        try:
-
-            id_template = int(
-                template_texto
-            )
-
-        except ValueError:
-
-            messagebox.showwarning(
-                "Huellas",
-                (
-                    "El ID del template "
-                    "debe ser un número entero."
-                )
-            )
-
-            return None
-
-
-        if id_template < 0:
-
-            messagebox.showwarning(
-                "Huellas",
-                (
-                    "El ID del template "
-                    "no puede ser negativo."
-                )
-            )
-
-            return None
+            return
 
 
         dedo = (
-            self.txt_dedo
+            self.cmb_dedo
             .get()
             .strip()
         )
@@ -926,47 +872,133 @@ class Huellas(tk.Frame):
             messagebox.showwarning(
                 "Huellas",
                 (
-                    "Indica qué dedo "
-                    "fue registrado."
+                    "Selecciona el dedo "
+                    "que vas a registrar."
                 )
             )
 
-            return None
+            return
 
 
-        if len(dedo) > 30:
-
-            messagebox.showwarning(
-                "Huellas",
-                (
-                    "El nombre del dedo "
-                    "no puede superar "
-                    "30 caracteres."
-                )
-            )
-
-            return None
-
-
-        return {
-            "id_alumno": self.mapa_alumnos[
+        id_alumno = (
+            self.mapa_alumnos[
                 alumno_texto
-            ],
-            "id_template": id_template,
-            "dedo": dedo
-        }
-
-
-    def guardar(self):
-
-        datos = (
-            self.validar_formulario()
+            ]
         )
 
 
-        if datos is None:
+        self.capturando = True
 
-            return
+
+        self.btn_capturar.config(
+            state="disabled",
+            text="Capturando..."
+        )
+
+
+        self.lbl_template.config(
+            text="—"
+        )
+
+
+        self.lbl_estado_sensor.config(
+            text=(
+                "Conectando con Arduino "
+                "y sensor..."
+            )
+        )
+
+
+        hilo = threading.Thread(
+            target=self.proceso_captura,
+            args=(
+                id_alumno,
+                alumno_texto,
+                dedo
+            ),
+            daemon=True
+        )
+
+        hilo.start()
+
+
+    def proceso_captura(
+        self,
+        id_alumno,
+        alumno_texto,
+        dedo
+    ):
+
+        try:
+
+            id_template = (
+                self.sensor
+                .enrolar_automatico(
+                    callback_estado=
+                    self.estado_desde_hilo
+                )
+            )
+
+
+            self.after(
+                0,
+                self.guardar_huella_bd,
+                id_alumno,
+                alumno_texto,
+                dedo,
+                id_template
+            )
+
+
+        except Exception as error:
+
+            self.after(
+                0,
+                self.error_sensor,
+                str(error)
+            )
+
+
+    def estado_desde_hilo(
+        self,
+        mensaje
+    ):
+
+        try:
+
+            self.after(
+                0,
+                self.lbl_estado_sensor.config,
+                {
+                    "text": mensaje
+                }
+            )
+
+        except tk.TclError:
+            pass
+
+
+    def guardar_huella_bd(
+        self,
+        id_alumno,
+        alumno_texto,
+        dedo,
+        id_template
+    ):
+
+        self.lbl_template.config(
+            text=str(
+                id_template
+            )
+        )
+
+
+        self.lbl_estado_sensor.config(
+            text=(
+                "Huella capturada. "
+                "Guardando en la base de datos..."
+            )
+        )
 
 
         resultado = (
@@ -974,9 +1006,9 @@ class Huellas(tk.Frame):
             .llamar_procedimiento(
                 "RegistrarHuella",
                 (
-                    datos["id_alumno"],
-                    datos["id_template"],
-                    datos["dedo"]
+                    id_alumno,
+                    id_template,
+                    dedo
                 )
             )
         )
@@ -984,36 +1016,199 @@ class Huellas(tk.Frame):
 
         if resultado is None:
 
-            messagebox.showerror(
-                "Huellas",
-                (
-                    "No se pudo registrar "
-                    "la huella.\n\n"
-                    + str(
-                        self.database
-                        .obtener_ultimo_error()
-                    )
+            error_bd = str(
+                self.database
+                .obtener_ultimo_error()
+            )
+
+
+            self.lbl_estado_sensor.config(
+                text=(
+                    "Error al guardar. "
+                    "Revirtiendo template "
+                    "del sensor..."
                 )
             )
 
+
+            hilo = threading.Thread(
+                target=self.revertir_template,
+                args=(
+                    id_template,
+                    error_bd
+                ),
+                daemon=True
+            )
+
+            hilo.start()
+
             return
+
+
+        self.capturando = False
+
+
+        self.btn_capturar.config(
+            state="normal",
+            text="Capturar y guardar huella"
+        )
+
+
+        self.lbl_estado_sensor.config(
+            text="Huella registrada correctamente."
+        )
 
 
         messagebox.showinfo(
             "Huellas",
             (
                 "Huella registrada "
-                "correctamente."
+                "correctamente.\n\n"
+                f"Alumno: {alumno_texto}\n"
+                f"Template: {id_template}\n"
+                f"Dedo: {dedo}"
             )
         )
 
 
         self.cargar_huellas()
 
-        self.nueva()
+
+    def revertir_template(
+        self,
+        id_template,
+        error_bd
+    ):
+
+        eliminado = False
+        error_sensor = ""
 
 
-    def obtener_seleccion(self):
+        try:
+
+            self.sensor.eliminar_template(
+                id_template
+            )
+
+            eliminado = True
+
+
+        except Exception as error:
+
+            error_sensor = str(
+                error
+            )
+
+
+        self.after(
+            0,
+            self.finalizar_error_bd,
+            error_bd,
+            eliminado,
+            error_sensor
+        )
+
+
+    def finalizar_error_bd(
+        self,
+        error_bd,
+        eliminado,
+        error_sensor
+    ):
+
+        self.capturando = False
+
+
+        self.btn_capturar.config(
+            state="normal",
+            text="Capturar y guardar huella"
+        )
+
+
+        if eliminado:
+
+            self.lbl_template.config(
+                text="—"
+            )
+
+            self.lbl_estado_sensor.config(
+                text=(
+                    "No se guardó la huella. "
+                    "El template fue retirado "
+                    "del sensor."
+                )
+            )
+
+
+            mensaje = (
+                "No se pudo guardar la huella "
+                "en la base de datos.\n\n"
+                f"{error_bd}\n\n"
+                "El template creado en el "
+                "sensor fue eliminado "
+                "automáticamente."
+            )
+
+
+        else:
+
+            self.lbl_estado_sensor.config(
+                text=(
+                    "Error de sincronización "
+                    "entre BD y sensor."
+                )
+            )
+
+
+            mensaje = (
+                "No se pudo guardar la huella "
+                "en la base de datos.\n\n"
+                f"{error_bd}\n\n"
+                "Además, no se pudo eliminar "
+                "el template del sensor:\n"
+                f"{error_sensor}"
+            )
+
+
+        messagebox.showerror(
+            "Huellas",
+            mensaje
+        )
+
+
+    def error_sensor(
+        self,
+        mensaje
+    ):
+
+        self.capturando = False
+
+
+        self.btn_capturar.config(
+            state="normal",
+            text="Capturar y guardar huella"
+        )
+
+
+        self.lbl_template.config(
+            text="—"
+        )
+
+
+        self.lbl_estado_sensor.config(
+            text="No se pudo registrar la huella."
+        )
+
+
+        messagebox.showerror(
+            "Sensor de huella",
+            mensaje
+        )
+
+
+    def obtener_huella_seleccionada(
+        self
+    ):
 
         seleccion = (
             self.tabla.selection()
@@ -1030,9 +1225,11 @@ class Huellas(tk.Frame):
             return None
 
 
-        valores = self.tabla.item(
-            seleccion[0],
-            "values"
+        valores = (
+            self.tabla.item(
+                seleccion[0],
+                "values"
+            )
         )
 
 
@@ -1046,20 +1243,18 @@ class Huellas(tk.Frame):
             "codigo": valores[2],
             "alumno": valores[3],
             "dedo": valores[4],
-            "fecha": valores[5],
             "estado": valores[6]
         }
 
 
-    def desactivar(self):
+    def desactivar_huella(self):
 
         huella = (
-            self.obtener_seleccion()
+            self.obtener_huella_seleccionada()
         )
 
 
         if huella is None:
-
             return
 
 
@@ -1094,7 +1289,6 @@ class Huellas(tk.Frame):
 
 
         if not confirmar:
-
             return
 
 
@@ -1103,7 +1297,9 @@ class Huellas(tk.Frame):
             .llamar_procedimiento(
                 "DesactivarHuella",
                 (
-                    huella["id_template"],
+                    huella[
+                        "id_template"
+                    ],
                 )
             )
         )
@@ -1137,11 +1333,18 @@ class Huellas(tk.Frame):
 
         self.cargar_huellas()
 
-        self.nueva()
-
 
     def actualizar(self):
 
         self.cargar_alumnos()
         self.cargar_huellas()
-        self.nueva()
+
+
+    def destroy(self):
+
+        try:
+            self.sensor.cerrar()
+        except Exception:
+            pass
+
+        super().destroy()
