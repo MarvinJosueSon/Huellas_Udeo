@@ -1,5 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+from PIL import Image, ImageTk
+import os
 
 
 class Login(tk.Frame):
@@ -12,11 +14,13 @@ class Login(tk.Frame):
     ):
         super().__init__(
             master,
-            bg="#F3F3F3"
+            bg="#F4F2F0"
         )
 
         self.database = database
         self.al_iniciar_sesion = al_iniciar_sesion
+
+        self.imagen_escudo = None
 
         self.pack(
             fill="both",
@@ -32,9 +36,9 @@ class Login(tk.Frame):
             self,
             bg="#FFFFFF",
             width=380,
-            height=360,
+            height=480,
             highlightthickness=1,
-            highlightbackground="#DADADA"
+            highlightbackground="#D8D5D2"
         )
 
         contenedor.place(
@@ -46,14 +50,53 @@ class Login(tk.Frame):
         contenedor.pack_propagate(False)
 
 
+        # ESCUDO UDEO
+
+        ruta_escudo = os.path.join(
+            os.path.dirname(__file__),
+            "assets",
+            "escudo_udeo.png"
+        )
+
+
+        if os.path.exists(
+            ruta_escudo
+        ):
+
+            imagen = Image.open(
+                ruta_escudo
+            )
+
+            imagen.thumbnail(
+                (105, 125),
+                Image.Resampling.LANCZOS
+            )
+
+            self.imagen_escudo = (
+                ImageTk.PhotoImage(
+                    imagen
+                )
+            )
+
+
+            tk.Label(
+                contenedor,
+                image=self.imagen_escudo,
+                bg="#FFFFFF",
+                bd=0
+            ).pack(
+                pady=(20, 5)
+            )
+
+
         tk.Label(
             contenedor,
             text="UDEO Assistance Digital",
             bg="#FFFFFF",
-            fg="#202020",
+            fg="#46384E",
             font=("Segoe UI", 20, "bold")
         ).pack(
-            pady=(35, 5)
+            pady=(5, 5)
         )
 
 
@@ -64,7 +107,7 @@ class Login(tk.Frame):
             fg="#666666",
             font=("Segoe UI", 10)
         ).pack(
-            pady=(0, 25)
+            pady=(0, 22)
         )
 
 
@@ -131,10 +174,10 @@ class Login(tk.Frame):
         self.btn_ingresar = tk.Button(
             formulario,
             text="Ingresar",
-            bg="#0078D4",
-            fg="#FFFFFF",
-            activebackground="#106EBE",
-            activeforeground="#FFFFFF",
+            bg="#DDA62F",
+            fg="#202020",
+            activebackground="#C99326",
+            activeforeground="#202020",
             relief="flat",
             bd=0,
             cursor="hand2",

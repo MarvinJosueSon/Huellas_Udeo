@@ -7,6 +7,7 @@ try:
     SERIAL_DISPONIBLE = True
 
 except ImportError:
+
     serial = None
     list_ports = None
 
@@ -20,6 +21,7 @@ class SensorHuellas:
         puerto=None,
         baudios=115200
     ):
+
         self.puerto = puerto
         self.baudios = baudios
         self.serial = None
@@ -28,18 +30,23 @@ class SensorHuellas:
     def detectar_puerto(self):
 
         if not SERIAL_DISPONIBLE:
+
             raise Exception(
                 "PySerial no está instalado."
             )
+
 
         puertos = list(
             list_ports.comports()
         )
 
+
         if not puertos:
+
             raise Exception(
                 "No se encontraron puertos seriales."
             )
+
 
         palabras = (
             "arduino",
@@ -50,6 +57,7 @@ class SensorHuellas:
             "usb-serial"
         )
 
+
         for puerto in puertos:
 
             descripcion = (
@@ -57,31 +65,35 @@ class SensorHuellas:
                 f"{puerto.description}"
             ).lower()
 
+
             if any(
                 palabra in descripcion
                 for palabra in palabras
             ):
+
                 return puerto.device
 
 
         if len(puertos) == 1:
+
             return puertos[0].device
 
 
         raise Exception(
-            "Hay varios puertos seriales y no "
-            "se pudo identificar automáticamente "
-            "el Arduino."
+            "Hay varios puertos seriales y "
+            "no se pudo identificar el Arduino."
         )
 
 
     def conectar(self):
 
         if self.esta_conectado():
+
             return True
 
 
         if not SERIAL_DISPONIBLE:
+
             raise Exception(
                 "PySerial no está instalado.\n"
                 "Instálalo con: pip install pyserial"
@@ -115,22 +127,54 @@ class SensorHuellas:
         )
 
 
-        respuesta = self.esperar_respuesta(
-            timeout=5
-        )
+        inicio = time.time()
 
 
-        if respuesta != "OK|READY":
+        while (
+            time.time() - inicio
+            < 6
+        ):
 
-            self.cerrar()
-
-            raise Exception(
-                "El Arduino respondió, pero "
-                "el sensor de huella no está listo."
+            linea = (
+                self.serial
+                .readline()
+                .decode(
+                    "utf-8",
+                    errors="ignore"
+                )
+                .strip()
             )
 
 
-        return True
+            if linea == "":
+                continue
+
+
+            if linea == "OK|READY":
+
+                return True
+
+
+            if linea.startswith(
+                "ERROR|"
+            ):
+
+                self.cerrar()
+
+                raise Exception(
+                    linea.split(
+                        "|",
+                        1
+                    )[1]
+                )
+
+
+        self.cerrar()
+
+
+        raise Exception(
+            "Arduino no respondió correctamente."
+        )
 
 
     def esta_conectado(self):
@@ -149,7 +193,7 @@ class SensorHuellas:
         if not self.esta_conectado():
 
             raise Exception(
-                "El Arduino no está conectado."
+                "Arduino no está conectado."
             )
 
 
@@ -158,6 +202,7 @@ class SensorHuellas:
             + "\n"
         )
 
+
         self.serial.write(
             mensaje.encode(
                 "utf-8"
@@ -165,39 +210,6 @@ class SensorHuellas:
         )
 
         self.serial.flush()
-
-
-    def esperar_respuesta(
-        self,
-        timeout=5
-    ):
-
-        inicio = time.time()
-
-
-        while (
-            time.time() - inicio
-            < timeout
-        ):
-
-            linea = (
-                self.serial
-                .readline()
-                .decode(
-                    "utf-8",
-                    errors="ignore"
-                )
-                .strip()
-            )
-
-
-            if linea != "":
-                return linea
-
-
-        raise Exception(
-            "Tiempo de espera agotado."
-        )
 
 
     def enrolar_automatico(
@@ -217,12 +229,11 @@ class SensorHuellas:
 
 
         inicio = time.time()
-        timeout = 90
 
 
         while (
             time.time() - inicio
-            < timeout
+            < 90
         ):
 
             linea = (
@@ -240,18 +251,22 @@ class SensorHuellas:
                 continue
 
 
-            partes = linea.split(
-                "|"
+            partes = (
+                linea.split("|")
             )
 
 
-            if partes[0] == "INFO":
+            if (
+                partes[0]
+                == "INFO"
+            ):
 
                 mensaje = "|".join(
                     partes[1:]
                 )
 
                 if callback_estado:
+
                     callback_estado(
                         mensaje
                     )
@@ -274,12 +289,15 @@ class SensorHuellas:
                 except ValueError:
 
                     raise Exception(
-                        "El Arduino devolvió "
+                        "Arduino devolvió "
                         "un template inválido."
                     )
 
 
-            if partes[0] == "ERROR":
+            if (
+                partes[0]
+                == "ERROR"
+            ):
 
                 mensaje = "|".join(
                     partes[1:]
@@ -293,6 +311,128 @@ class SensorHuellas:
         raise Exception(
             "Se agotó el tiempo para "
             "registrar la huella."
+        )
+
+
+    def identificar_huella(
+        self,
+        callback_estado=None
+    ):
+
+        self.conectar()
+
+
+        self.serial.reset_input_buffer()
+
+
+        self.enviar_linea(
+            "IDENTIFY"
+        )
+
+
+        inicio = time.time()
+
+
+        while (
+            time.time() - inicio
+            < 40
+        ):
+
+            linea = (
+                self.serial
+                .readline()
+                .decode(
+                    "utf-8",
+                    errors="ignore"
+                )
+                .strip()
+            )
+
+
+            if linea == "":
+                continue
+
+
+            partes = (
+                linea.split("|")
+            )
+
+
+            if (
+                partes[0]
+                == "INFO"
+            ):
+
+                mensaje = "|".join(
+                    partes[1:]
+                )
+
+
+                if callback_estado:
+
+                    callback_estado(
+                        mensaje
+                    )
+
+
+                continue
+
+
+            if (
+                len(partes) >= 3
+                and partes[0] == "OK"
+                and partes[1] == "IDENTIFY"
+            ):
+
+                try:
+
+                    id_template = int(
+                        partes[2]
+                    )
+
+                    confianza = 0
+
+
+                    if len(partes) >= 4:
+
+                        confianza = int(
+                            partes[3]
+                        )
+
+
+                    return {
+                        "id_template":
+                            id_template,
+                        "confianza":
+                            confianza
+                    }
+
+
+                except ValueError:
+
+                    raise Exception(
+                        "Arduino devolvió "
+                        "una identificación inválida."
+                    )
+
+
+            if (
+                partes[0]
+                == "ERROR"
+            ):
+
+                mensaje = "|".join(
+                    partes[1:]
+                )
+
+
+                raise Exception(
+                    mensaje
+                )
+
+
+        raise Exception(
+            "Tiempo agotado esperando una huella."
         )
 
 
@@ -368,9 +508,11 @@ class SensorHuellas:
             try:
 
                 if self.serial.is_open:
+
                     self.serial.close()
 
             except Exception:
+
                 pass
 
 

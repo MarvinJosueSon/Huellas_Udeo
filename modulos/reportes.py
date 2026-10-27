@@ -1,6 +1,32 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, date, timedelta
+from decimal import Decimal
+
+try:
+    from openpyxl import Workbook
+    from openpyxl.styles import (
+        Font,
+        PatternFill,
+        Alignment,
+        Border,
+        Side
+    )
+    from openpyxl.utils import get_column_letter
+
+    OPENPYXL_DISPONIBLE = True
+
+except ImportError:
+
+    Workbook = None
+    Font = None
+    PatternFill = None
+    Alignment = None
+    Border = None
+    Side = None
+    get_column_letter = None
+
+    OPENPYXL_DISPONIBLE = False
 
 
 class Reportes(tk.Frame):
@@ -19,6 +45,11 @@ class Reportes(tk.Frame):
 
         self.mapa_secciones = {}
         self.mapa_periodos = {}
+
+        self.columnas_reporte_actual = []
+        self.datos_reporte_actual = []
+        self.titulo_reporte_actual = ""
+        self.detalles_reporte_actual = []
 
         self.pack(
             fill="both",
@@ -53,6 +84,28 @@ class Reportes(tk.Frame):
             font=("Segoe UI", 24, "bold")
         ).pack(
             side="left"
+        )
+
+
+        self.btn_exportar = tk.Button(
+            encabezado,
+            text="Exportar a Excel",
+            bg="#107C10",
+            fg="#FFFFFF",
+            activebackground="#0B6A0B",
+            activeforeground="#FFFFFF",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            font=("Segoe UI", 10, "bold"),
+            command=self.exportar_excel,
+            state="disabled"
+        )
+
+        self.btn_exportar.pack(
+            side="right",
+            ipadx=15,
+            ipady=7
         )
 
 
@@ -1129,6 +1182,30 @@ class Reportes(tk.Frame):
         )
 
 
+        self.columnas_reporte_actual = columnas
+        self.datos_reporte_actual = datos
+        self.titulo_reporte_actual = (
+            self.cmb_tipo.get()
+        )
+
+        self.detalles_reporte_actual = (
+            self.obtener_detalles_exportacion()
+        )
+
+
+        if datos:
+
+            self.btn_exportar.config(
+                state="normal"
+            )
+
+        else:
+
+            self.btn_exportar.config(
+                state="disabled"
+            )
+
+
         for registro in datos:
 
             valores = []
@@ -1229,6 +1306,643 @@ class Reportes(tk.Frame):
         self.lbl_resultados.config(
             text="Resultados: 0"
         )
+
+
+        self.columnas_reporte_actual = []
+        self.datos_reporte_actual = []
+        self.titulo_reporte_actual = ""
+        self.detalles_reporte_actual = []
+
+
+        if hasattr(
+            self,
+            "btn_exportar"
+        ):
+
+            self.btn_exportar.config(
+                state="disabled"
+            )
+
+
+    def obtener_detalles_exportacion(self):
+
+        tipo = (
+            self.cmb_tipo
+            .get()
+        )
+
+        detalles = []
+
+
+        if tipo in (
+            "Asistencia por curso/sección",
+            "Puntualidad"
+        ):
+
+            if hasattr(
+                self,
+                "cmb_seccion"
+            ):
+
+                seccion = (
+                    self.cmb_seccion
+                    .get()
+                    .strip()
+                )
+
+                if seccion:
+
+                    detalles.append(
+                        (
+                            "Sección",
+                            seccion
+                        )
+                    )
+
+
+        elif tipo == "Asistencia por fecha":
+
+            if hasattr(
+                self,
+                "txt_fecha"
+            ):
+
+                fecha = (
+                    self.txt_fecha
+                    .get()
+                    .strip()
+                )
+
+                if fecha:
+
+                    detalles.append(
+                        (
+                            "Fecha",
+                            fecha
+                        )
+                    )
+
+
+        elif tipo == "Final de periodo":
+
+            if hasattr(
+                self,
+                "cmb_periodo"
+            ):
+
+                periodo = (
+                    self.cmb_periodo
+                    .get()
+                    .strip()
+                )
+
+                if periodo:
+
+                    detalles.append(
+                        (
+                            "Periodo",
+                            periodo
+                        )
+                    )
+
+
+        return detalles
+
+
+    def exportar_excel(self):
+
+        if not OPENPYXL_DISPONIBLE:
+
+            messagebox.showerror(
+                "Exportar a Excel",
+                (
+                    "No se encontró la librería "
+                    "openpyxl.\n\n"
+                    "Instálala con:\n"
+                    "pip install openpyxl"
+                )
+            )
+
+            return
+
+
+        if not self.datos_reporte_actual:
+
+            messagebox.showwarning(
+                "Exportar a Excel",
+                (
+                    "Primero debes consultar "
+                    "un reporte con resultados."
+                )
+            )
+
+            return
+
+
+        nombre_reporte = (
+            self.titulo_reporte_actual
+            .lower()
+            .replace(
+                "/",
+                "_"
+            )
+            .replace(
+                " ",
+                "_"
+            )
+            .replace(
+                "ó",
+                "o"
+            )
+            .replace(
+                "í",
+                "i"
+            )
+            .replace(
+                "á",
+                "a"
+            )
+            .replace(
+                "é",
+                "e"
+            )
+            .replace(
+                "ú",
+                "u"
+            )
+        )
+
+
+        nombre_archivo = (
+            f"{nombre_reporte}_"
+            f"{datetime.now().strftime('%Y%m%d')}"
+            ".xlsx"
+        )
+
+
+        ruta = filedialog.asksaveasfilename(
+            title="Guardar reporte en Excel",
+            defaultextension=".xlsx",
+            initialfile=nombre_archivo,
+            filetypes=[
+                (
+                    "Archivo de Excel",
+                    "*.xlsx"
+                )
+            ]
+        )
+
+
+        if not ruta:
+
+            return
+
+
+        try:
+
+            libro = Workbook()
+
+            hoja = libro.active
+
+            hoja.title = "Reporte"
+
+
+            cantidad_columnas = len(
+                self.columnas_reporte_actual
+            )
+
+
+            ultima_columna = (
+                get_column_letter(
+                    cantidad_columnas
+                )
+            )
+
+
+            hoja.merge_cells(
+                f"A1:{ultima_columna}1"
+            )
+
+
+            celda_titulo = hoja["A1"]
+
+            celda_titulo.value = (
+                "UDEO Assistance Digital"
+            )
+
+            celda_titulo.font = Font(
+                name="Segoe UI",
+                size=16,
+                bold=True
+            )
+
+            celda_titulo.alignment = Alignment(
+                horizontal="center",
+                vertical="center"
+            )
+
+
+            hoja.merge_cells(
+                f"A2:{ultima_columna}2"
+            )
+
+
+            celda_reporte = hoja["A2"]
+
+            celda_reporte.value = (
+                self.titulo_reporte_actual
+            )
+
+            celda_reporte.font = Font(
+                name="Segoe UI",
+                size=13,
+                bold=True
+            )
+
+            celda_reporte.alignment = Alignment(
+                horizontal="center",
+                vertical="center"
+            )
+
+
+            fila_actual = 4
+
+
+            for nombre, valor in (
+                self.detalles_reporte_actual
+            ):
+
+                hoja.cell(
+                    row=fila_actual,
+                    column=1,
+                    value=nombre
+                ).font = Font(
+                    bold=True
+                )
+
+
+                hoja.cell(
+                    row=fila_actual,
+                    column=2,
+                    value=valor
+                )
+
+
+                fila_actual += 1
+
+
+            hoja.cell(
+                row=fila_actual,
+                column=1,
+                value="Fecha de generación"
+            ).font = Font(
+                bold=True
+            )
+
+
+            hoja.cell(
+                row=fila_actual,
+                column=2,
+                value=datetime.now()
+            ).number_format = (
+                "yyyy-mm-dd hh:mm:ss"
+            )
+
+
+            fila_actual += 2
+
+            fila_encabezado = fila_actual
+
+
+            relleno_encabezado = PatternFill(
+                fill_type="solid",
+                fgColor="0078D4"
+            )
+
+
+            fuente_encabezado = Font(
+                color="FFFFFF",
+                bold=True
+            )
+
+
+            borde = Border(
+                left=Side(
+                    style="thin",
+                    color="D9D9D9"
+                ),
+                right=Side(
+                    style="thin",
+                    color="D9D9D9"
+                ),
+                top=Side(
+                    style="thin",
+                    color="D9D9D9"
+                ),
+                bottom=Side(
+                    style="thin",
+                    color="D9D9D9"
+                )
+            )
+
+
+            for indice, (
+                clave,
+                titulo,
+                ancho
+            ) in enumerate(
+                self.columnas_reporte_actual,
+                start=1
+            ):
+
+                celda = hoja.cell(
+                    row=fila_encabezado,
+                    column=indice,
+                    value=titulo
+                )
+
+
+                celda.fill = (
+                    relleno_encabezado
+                )
+
+                celda.font = (
+                    fuente_encabezado
+                )
+
+                celda.alignment = Alignment(
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
+                )
+
+                celda.border = borde
+
+
+            fila_datos = (
+                fila_encabezado + 1
+            )
+
+
+            for registro in (
+                self.datos_reporte_actual
+            ):
+
+                for indice, (
+                    clave,
+                    titulo,
+                    ancho
+                ) in enumerate(
+                    self.columnas_reporte_actual,
+                    start=1
+                ):
+
+                    valor = registro.get(
+                        clave,
+                        ""
+                    )
+
+
+                    valor_excel = (
+                        self.preparar_valor_excel(
+                            valor
+                        )
+                    )
+
+
+                    celda = hoja.cell(
+                        row=fila_datos,
+                        column=indice,
+                        value=valor_excel
+                    )
+
+
+                    celda.border = borde
+
+                    celda.alignment = Alignment(
+                        vertical="center"
+                    )
+
+
+                    if isinstance(
+                        valor,
+                        datetime
+                    ):
+
+                        celda.number_format = (
+                            "yyyy-mm-dd hh:mm:ss"
+                        )
+
+
+                    elif isinstance(
+                        valor,
+                        date
+                    ):
+
+                        celda.number_format = (
+                            "yyyy-mm-dd"
+                        )
+
+
+                    if clave in (
+                        "porcentaje",
+                        "porcentaje_puntualidad"
+                    ):
+
+                        celda.number_format = (
+                            '0.00"%"'
+                        )
+
+
+                fila_datos += 1
+
+
+            ultima_fila = (
+                fila_datos - 1
+            )
+
+
+            hoja.auto_filter.ref = (
+                f"A{fila_encabezado}:"
+                f"{ultima_columna}"
+                f"{ultima_fila}"
+            )
+
+
+            hoja.freeze_panes = (
+                f"A{fila_encabezado + 1}"
+            )
+
+
+            self.ajustar_columnas_excel(
+                hoja,
+                fila_encabezado
+            )
+
+
+            hoja.row_dimensions[
+                1
+            ].height = 25
+
+            hoja.row_dimensions[
+                2
+            ].height = 22
+
+
+            libro.save(
+                ruta
+            )
+
+
+            messagebox.showinfo(
+                "Exportar a Excel",
+                (
+                    "El reporte fue exportado "
+                    "correctamente."
+                )
+            )
+
+
+        except PermissionError:
+
+            messagebox.showerror(
+                "Exportar a Excel",
+                (
+                    "No se pudo guardar el archivo.\n\n"
+                    "Verifica que el archivo no esté "
+                    "abierto en Excel."
+                )
+            )
+
+
+        except Exception as error:
+
+            messagebox.showerror(
+                "Exportar a Excel",
+                (
+                    "No se pudo exportar "
+                    "el reporte.\n\n"
+                    f"{error}"
+                )
+            )
+
+
+    def preparar_valor_excel(
+        self,
+        valor
+    ):
+
+        if valor is None:
+
+            return ""
+
+
+        if isinstance(
+            valor,
+            Decimal
+        ):
+
+            return float(
+                valor
+            )
+
+
+        if isinstance(
+            valor,
+            timedelta
+        ):
+
+            segundos = int(
+                valor.total_seconds()
+            )
+
+            horas = (
+                segundos // 3600
+            )
+
+            minutos = (
+                segundos % 3600
+            ) // 60
+
+            segundos_resto = (
+                segundos % 60
+            )
+
+
+            return (
+                f"{horas:02d}:"
+                f"{minutos:02d}:"
+                f"{segundos_resto:02d}"
+            )
+
+
+        return valor
+
+
+    def ajustar_columnas_excel(
+        self,
+        hoja,
+        fila_encabezado
+    ):
+
+        for indice, (
+            clave,
+            titulo,
+            ancho_tabla
+        ) in enumerate(
+            self.columnas_reporte_actual,
+            start=1
+        ):
+
+            letra = (
+                get_column_letter(
+                    indice
+                )
+            )
+
+
+            ancho_maximo = len(
+                str(
+                    titulo
+                )
+            )
+
+
+            for fila in range(
+                fila_encabezado,
+                hoja.max_row + 1
+            ):
+
+                valor = hoja.cell(
+                    row=fila,
+                    column=indice
+                ).value
+
+
+                if valor is None:
+
+                    continue
+
+
+                ancho_maximo = max(
+                    ancho_maximo,
+                    len(
+                        str(
+                            valor
+                        )
+                    )
+                )
+
+
+            hoja.column_dimensions[
+                letra
+            ].width = min(
+                max(
+                    ancho_maximo + 2,
+                    12
+                ),
+                35
+            )
 
 
     def formatear_valor(

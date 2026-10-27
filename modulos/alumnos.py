@@ -12,7 +12,7 @@ class Alumnos(tk.Frame):
     ):
         super().__init__(
             master,
-            bg="#F3F3F3"
+            bg="#F4F2F0"
         )
 
         self.database = database
@@ -38,7 +38,7 @@ class Alumnos(tk.Frame):
 
         encabezado = tk.Frame(
             self,
-            bg="#F3F3F3"
+            bg="#F4F2F0"
         )
 
         encabezado.pack(
@@ -51,8 +51,8 @@ class Alumnos(tk.Frame):
         tk.Label(
             encabezado,
             text="Alumnos",
-            bg="#F3F3F3",
-            fg="#202020",
+            bg="#F4F2F0",
+            fg="#46384E",
             font=("Segoe UI", 24, "bold")
         ).pack(
             side="left"
@@ -62,10 +62,10 @@ class Alumnos(tk.Frame):
         tk.Button(
             encabezado,
             text="+ Nuevo alumno",
-            bg="#0078D4",
-            fg="#FFFFFF",
-            activebackground="#106EBE",
-            activeforeground="#FFFFFF",
+            bg="#DDA62F",
+            fg="#202020",
+            activebackground="#C99326",
+            activeforeground="#202020",
             relief="flat",
             bd=0,
             font=("Segoe UI", 10, "bold"),
@@ -80,7 +80,7 @@ class Alumnos(tk.Frame):
 
         panel_busqueda = tk.Frame(
             self,
-            bg="#F3F3F3"
+            bg="#F4F2F0"
         )
 
         panel_busqueda.pack(
@@ -93,7 +93,7 @@ class Alumnos(tk.Frame):
         tk.Label(
             panel_busqueda,
             text="Buscar:",
-            bg="#F3F3F3",
+            bg="#F4F2F0",
             fg="#202020",
             font=("Segoe UI", 10)
         ).pack(
@@ -120,9 +120,9 @@ class Alumnos(tk.Frame):
         tk.Button(
             panel_busqueda,
             text="Buscar",
-            bg="#E5E5E5",
+            bg="#E8E6E3",
             fg="#202020",
-            activebackground="#D5D5D5",
+            activebackground="#DAD7D3",
             relief="flat",
             bd=0,
             font=("Segoe UI", 9),
@@ -138,9 +138,9 @@ class Alumnos(tk.Frame):
         tk.Button(
             panel_busqueda,
             text="Mostrar todos",
-            bg="#E5E5E5",
+            bg="#E8E6E3",
             fg="#202020",
-            activebackground="#D5D5D5",
+            activebackground="#DAD7D3",
             relief="flat",
             bd=0,
             font=("Segoe UI", 9),
@@ -156,7 +156,7 @@ class Alumnos(tk.Frame):
 
         cuerpo = tk.Frame(
             self,
-            bg="#F3F3F3"
+            bg="#F4F2F0"
         )
 
         cuerpo.pack(
@@ -187,7 +187,7 @@ class Alumnos(tk.Frame):
             cuerpo,
             bg="#FFFFFF",
             highlightthickness=1,
-            highlightbackground="#DDDDDD"
+            highlightbackground="#D8D5D2"
         )
 
         panel_tabla.grid(
@@ -364,7 +364,7 @@ class Alumnos(tk.Frame):
             bg="#FFFFFF",
             width=360,
             highlightthickness=1,
-            highlightbackground="#DDDDDD"
+            highlightbackground="#D8D5D2"
         )
 
         panel_formulario.grid(
@@ -382,7 +382,7 @@ class Alumnos(tk.Frame):
             panel_formulario,
             text="Nuevo alumno",
             bg="#FFFFFF",
-            fg="#202020",
+            fg="#46384E",
             font=("Segoe UI", 15, "bold")
         )
 
@@ -477,10 +477,10 @@ class Alumnos(tk.Frame):
         self.btn_guardar = tk.Button(
             panel_formulario,
             text="Guardar alumno",
-            bg="#0078D4",
-            fg="#FFFFFF",
-            activebackground="#106EBE",
-            activeforeground="#FFFFFF",
+            bg="#DDA62F",
+            fg="#202020",
+            activebackground="#C99326",
+            activeforeground="#202020",
             relief="flat",
             bd=0,
             font=("Segoe UI", 10, "bold"),
@@ -499,9 +499,9 @@ class Alumnos(tk.Frame):
         tk.Button(
             panel_formulario,
             text="Cancelar",
-            bg="#E5E5E5",
+            bg="#E8E6E3",
             fg="#202020",
-            activebackground="#D5D5D5",
+            activebackground="#DAD7D3",
             relief="flat",
             bd=0,
             font=("Segoe UI", 10),
@@ -516,7 +516,7 @@ class Alumnos(tk.Frame):
 
         panel_acciones = tk.Frame(
             self,
-            bg="#F3F3F3"
+            bg="#F4F2F0"
         )
 
         panel_acciones.pack(
@@ -529,9 +529,9 @@ class Alumnos(tk.Frame):
         tk.Button(
             panel_acciones,
             text="Editar",
-            bg="#E5E5E5",
+            bg="#E8E6E3",
             fg="#202020",
-            activebackground="#D5D5D5",
+            activebackground="#DAD7D3",
             relief="flat",
             bd=0,
             font=("Segoe UI", 10),
@@ -547,9 +547,9 @@ class Alumnos(tk.Frame):
         tk.Button(
             panel_acciones,
             text="Inactivar",
-            bg="#E5E5E5",
-            fg="#202020",
-            activebackground="#D5D5D5",
+            bg="#8F2533",
+            fg="#FFFFFF",
+            activebackground="#77202B",
             relief="flat",
             bd=0,
             font=("Segoe UI", 10),
@@ -565,10 +565,29 @@ class Alumnos(tk.Frame):
 
         tk.Button(
             panel_acciones,
+            text="Activar",
+            bg="#3F7C49",
+            fg="#FFFFFF",
+            activebackground="#34683D",
+            relief="flat",
+            bd=0,
+            font=("Segoe UI", 10),
+            cursor="hand2",
+            command=self.activar
+        ).pack(
+            side="left",
+            padx=(0, 10),
+            ipadx=15,
+            ipady=5
+        )
+
+
+        tk.Button(
+            panel_acciones,
             text="Actualizar",
-            bg="#E5E5E5",
+            bg="#E8E6E3",
             fg="#202020",
-            activebackground="#D5D5D5",
+            activebackground="#DAD7D3",
             relief="flat",
             bd=0,
             font=("Segoe UI", 10),
@@ -1355,6 +1374,88 @@ class Alumnos(tk.Frame):
         messagebox.showinfo(
             "Alumnos",
             "Alumno inactivado correctamente."
+        )
+
+
+        self.cargar_alumnos()
+
+        self.nuevo()
+
+
+    def activar(self):
+
+        alumno = (
+            self.obtener_seleccion()
+        )
+
+
+        if alumno is None:
+
+            return
+
+
+        if alumno["estado"] == "ACTIVO":
+
+            messagebox.showinfo(
+                "Alumnos",
+                (
+                    "El alumno ya se encuentra "
+                    "activo."
+                )
+            )
+
+            return
+
+
+        confirmar = (
+            messagebox.askyesno(
+                "Activar alumno",
+                (
+                    "¿Deseas activar al alumno?\n\n"
+                    f"{alumno['codigo']} - "
+                    f"{alumno['nombre']} "
+                    f"{alumno['apellido']}"
+                )
+            )
+        )
+
+
+        if not confirmar:
+
+            return
+
+
+        resultado = (
+            self.database
+            .llamar_procedimiento(
+                "ActivarAlumno",
+                (
+                    alumno["id"],
+                )
+            )
+        )
+
+
+        if resultado is None:
+
+            messagebox.showerror(
+                "Alumnos",
+                (
+                    "No se pudo activar "
+                    "el alumno.\n\n"
+                    + str(
+                        self.database
+                        .obtener_ultimo_error()
+                    )
+                )
+            )
+
+            return
+
+
+        messagebox.showinfo(
+            "Alumnos",
+            "Alumno activado correctamente."
         )
 
 

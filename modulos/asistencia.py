@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from datetime import datetime
+from datetime import datetime, timedelta
+import threading
+
+from sensor_huellas import SensorHuellas
 
 
 class Asistencia(tk.Frame):
@@ -10,6 +13,7 @@ class Asistencia(tk.Frame):
         master,
         database
     ):
+
         super().__init__(
             master,
             bg="#F3F3F3"
@@ -17,17 +21,25 @@ class Asistencia(tk.Frame):
 
         self.database = database
 
-        self.datos_sesiones = []
+        self.sensor = SensorHuellas()
+
         self.mapa_sesiones = {}
 
-        self.datos_asistencias = []
+        self.lector_activo = False
+
+        self.id_sesion_lector = None
+
+        self.hilo_lector = None
+
 
         self.pack(
             fill="both",
             expand=True
         )
 
+
         self.crear_interfaz()
+
         self.cargar_sesiones()
 
 
@@ -50,27 +62,13 @@ class Asistencia(tk.Frame):
             text="Asistencia",
             bg="#F3F3F3",
             fg="#202020",
-            font=("Segoe UI", 24, "bold")
+            font=(
+                "Segoe UI",
+                24,
+                "bold"
+            )
         ).pack(
             side="left"
-        )
-
-
-        tk.Button(
-            encabezado,
-            text="Actualizar",
-            bg="#E5E5E5",
-            fg="#202020",
-            activebackground="#D5D5D5",
-            relief="flat",
-            bd=0,
-            cursor="hand2",
-            font=("Segoe UI", 9),
-            command=self.actualizar
-        ).pack(
-            side="right",
-            ipadx=12,
-            ipady=4
         )
 
 
@@ -93,11 +91,17 @@ class Asistencia(tk.Frame):
             text="Sesión",
             bg="#FFFFFF",
             fg="#202020",
-            font=("Segoe UI", 10, "bold")
-        ).pack(
-            side="left",
-            padx=(20, 8),
-            pady=15
+            font=(
+                "Segoe UI",
+                10,
+                "bold"
+            )
+        ).grid(
+            row=0,
+            column=0,
+            sticky="w",
+            padx=20,
+            pady=(15, 5)
         )
 
 
@@ -107,13 +111,14 @@ class Asistencia(tk.Frame):
             width=75
         )
 
-        self.cmb_sesion.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            padx=(0, 20),
-            pady=15
+        self.cmb_sesion.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=(20, 10),
+            pady=(0, 15)
         )
+
 
         self.cmb_sesion.bind(
             "<<ComboboxSelected>>",
@@ -121,78 +126,115 @@ class Asistencia(tk.Frame):
         )
 
 
-        panel_registro = tk.Frame(
-            self,
-            bg="#F3F3F3"
+        tk.Button(
+            panel_sesion,
+            text="Actualizar",
+            bg="#E5E5E5",
+            fg="#202020",
+            activebackground="#D5D5D5",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            font=("Segoe UI", 9),
+            command=self.cargar_sesiones
+        ).grid(
+            row=1,
+            column=1,
+            padx=(0, 20),
+            pady=(0, 15),
+            ipadx=15,
+            ipady=5
         )
 
-        panel_registro.pack(
+
+        panel_sesion.grid_columnconfigure(
+            0,
+            weight=1
+        )
+
+
+        panel_sensor = tk.Frame(
+            self,
+            bg="#FFFFFF",
+            highlightthickness=1,
+            highlightbackground="#DDDDDD"
+        )
+
+        panel_sensor.pack(
             fill="x",
             padx=30,
             pady=(0, 15)
         )
 
 
-        panel_codigo = tk.Frame(
-            panel_registro,
-            bg="#FFFFFF",
-            highlightthickness=1,
-            highlightbackground="#DDDDDD"
-        )
-
-        panel_codigo.pack(
-            side="left",
-            fill="both",
-            expand=True,
-            padx=(0, 7)
-        )
-
-
         tk.Label(
-            panel_codigo,
-            text="Registrar por código",
+            panel_sensor,
+            text="Lector de huella",
             bg="#FFFFFF",
             fg="#202020",
-            font=("Segoe UI", 12, "bold")
-        ).pack(
-            anchor="w",
+            font=(
+                "Segoe UI",
+                14,
+                "bold"
+            )
+        ).grid(
+            row=0,
+            column=0,
+            columnspan=3,
+            sticky="w",
             padx=20,
-            pady=(15, 10)
+            pady=(15, 5)
         )
 
 
-        tk.Label(
-            panel_codigo,
-            text="Código del alumno",
+        self.lbl_estado_sensor = tk.Label(
+            panel_sensor,
+            text=(
+                "Selecciona una sesión "
+                "y presiona Iniciar lector."
+            ),
             bg="#FFFFFF",
-            fg="#202020",
-            font=("Segoe UI", 9)
-        ).pack(
-            anchor="w",
-            padx=20
+            fg="#555555",
+            font=("Segoe UI", 10),
+            anchor="w"
         )
 
-
-        self.txt_codigo = ttk.Entry(
-            panel_codigo
-        )
-
-        self.txt_codigo.pack(
-            fill="x",
+        self.lbl_estado_sensor.grid(
+            row=1,
+            column=0,
+            columnspan=3,
+            sticky="ew",
             padx=20,
             pady=(5, 10)
         )
 
-        self.txt_codigo.bind(
-            "<Return>",
-            lambda event:
-                self.registrar_por_codigo()
+
+        self.lbl_ultimo_alumno = tk.Label(
+            panel_sensor,
+            text="",
+            bg="#FFFFFF",
+            fg="#0078D4",
+            font=(
+                "Segoe UI",
+                11,
+                "bold"
+            ),
+            anchor="w"
+        )
+
+        self.lbl_ultimo_alumno.grid(
+            row=2,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+            padx=20,
+            pady=(0, 15)
         )
 
 
-        tk.Button(
-            panel_codigo,
-            text="Registrar asistencia",
+        self.btn_iniciar = tk.Button(
+            panel_sensor,
+            text="Iniciar lector",
             bg="#0078D4",
             fg="#FFFFFF",
             activebackground="#106EBE",
@@ -200,169 +242,81 @@ class Asistencia(tk.Frame):
             relief="flat",
             bd=0,
             cursor="hand2",
-            font=("Segoe UI", 10, "bold"),
-            command=self.registrar_por_codigo
-        ).pack(
-            fill="x",
-            padx=20,
-            pady=(0, 15),
-            ipady=5
+            font=(
+                "Segoe UI",
+                10,
+                "bold"
+            ),
+            command=self.iniciar_lector
+        )
+
+        self.btn_iniciar.grid(
+            row=3,
+            column=0,
+            padx=(20, 5),
+            pady=(0, 18),
+            ipadx=20,
+            ipady=6,
+            sticky="w"
         )
 
 
-        panel_huella = tk.Frame(
-            panel_registro,
-            bg="#FFFFFF",
-            highlightthickness=1,
-            highlightbackground="#DDDDDD"
-        )
-
-        panel_huella.pack(
-            side="left",
-            fill="both",
-            expand=True,
-            padx=(7, 0)
-        )
-
-
-        tk.Label(
-            panel_huella,
-            text="Registrar por huella",
-            bg="#FFFFFF",
+        self.btn_detener = tk.Button(
+            panel_sensor,
+            text="Detener lector",
+            bg="#E5E5E5",
             fg="#202020",
-            font=("Segoe UI", 12, "bold")
-        ).pack(
-            anchor="w",
-            padx=20,
-            pady=(15, 10)
-        )
-
-
-        tk.Label(
-            panel_huella,
-            text="ID del template",
-            bg="#FFFFFF",
-            fg="#202020",
-            font=("Segoe UI", 9)
-        ).pack(
-            anchor="w",
-            padx=20
-        )
-
-
-        self.txt_template = ttk.Entry(
-            panel_huella
-        )
-
-        self.txt_template.pack(
-            fill="x",
-            padx=20,
-            pady=(5, 10)
-        )
-
-        self.txt_template.bind(
-            "<Return>",
-            lambda event:
-                self.registrar_por_huella()
-        )
-
-
-        tk.Button(
-            panel_huella,
-            text="Registrar huella",
-            bg="#0078D4",
-            fg="#FFFFFF",
-            activebackground="#106EBE",
-            activeforeground="#FFFFFF",
+            activebackground="#D5D5D5",
             relief="flat",
             bd=0,
             cursor="hand2",
-            font=("Segoe UI", 10, "bold"),
-            command=self.registrar_por_huella
-        ).pack(
-            fill="x",
-            padx=20,
-            pady=(0, 15),
-            ipady=5
+            font=(
+                "Segoe UI",
+                10
+            ),
+            command=self.detener_lector,
+            state="disabled"
+        )
+
+        self.btn_detener.grid(
+            row=3,
+            column=1,
+            padx=5,
+            pady=(0, 18),
+            ipadx=20,
+            ipady=6,
+            sticky="w"
         )
 
 
-        panel_filtros = tk.Frame(
+        panel_sensor.grid_columnconfigure(
+            2,
+            weight=1
+        )
+
+
+        panel_info = tk.Frame(
             self,
             bg="#F3F3F3"
         )
 
-        panel_filtros.pack(
+        panel_info.pack(
             fill="x",
             padx=30,
-            pady=(0, 10)
+            pady=(0, 8)
         )
 
 
-        tk.Label(
-            panel_filtros,
-            text="Buscar:",
+        self.lbl_resultados = tk.Label(
+            panel_info,
+            text="Asistencias registradas: 0",
             bg="#F3F3F3",
-            fg="#202020",
-            font=("Segoe UI", 10)
-        ).pack(
+            fg="#666666",
+            font=("Segoe UI", 9)
+        )
+
+        self.lbl_resultados.pack(
             side="left"
-        )
-
-
-        self.txt_buscar = ttk.Entry(
-            panel_filtros,
-            width=35
-        )
-
-        self.txt_buscar.pack(
-            side="left",
-            padx=(8, 20)
-        )
-
-        self.txt_buscar.bind(
-            "<KeyRelease>",
-            self.filtrar
-        )
-
-
-        tk.Label(
-            panel_filtros,
-            text="Estado:",
-            bg="#F3F3F3",
-            fg="#202020",
-            font=("Segoe UI", 10)
-        ).pack(
-            side="left"
-        )
-
-
-        self.cmb_estado = ttk.Combobox(
-            panel_filtros,
-            state="readonly",
-            values=(
-                "TODOS",
-                "PRESENTE",
-                "TARDE",
-                "AUSENTE",
-                "FUERA_TIEMPO",
-                "JUSTIFICADA"
-            ),
-            width=18
-        )
-
-        self.cmb_estado.set(
-            "TODOS"
-        )
-
-        self.cmb_estado.pack(
-            side="left",
-            padx=8
-        )
-
-        self.cmb_estado.bind(
-            "<<ComboboxSelected>>",
-            self.filtrar
         )
 
 
@@ -377,7 +331,7 @@ class Asistencia(tk.Frame):
             fill="both",
             expand=True,
             padx=30,
-            pady=(0, 15)
+            pady=(0, 10)
         )
 
 
@@ -415,7 +369,7 @@ class Asistencia(tk.Frame):
 
         self.tabla.heading(
             "hora",
-            text="Hora de registro"
+            text="Hora registro"
         )
 
         self.tabla.heading(
@@ -426,29 +380,29 @@ class Asistencia(tk.Frame):
 
         self.tabla.column(
             "id",
-            width=70,
+            width=60,
             anchor="center"
         )
 
         self.tabla.column(
             "codigo",
-            width=140
+            width=120
         )
 
         self.tabla.column(
             "alumno",
-            width=300
+            width=280
         )
 
         self.tabla.column(
             "hora",
-            width=180,
+            width=160,
             anchor="center"
         )
 
         self.tabla.column(
             "estado",
-            width=150,
+            width=130,
             anchor="center"
         )
 
@@ -461,19 +415,33 @@ class Asistencia(tk.Frame):
 
 
         self.tabla.configure(
-            yscrollcommand=scroll_vertical.set
+            yscrollcommand=
+            scroll_vertical.set
         )
 
 
-        self.tabla.pack(
-            side="left",
-            fill="both",
-            expand=True
+        self.tabla.grid(
+            row=0,
+            column=0,
+            sticky="nsew"
         )
 
-        scroll_vertical.pack(
-            side="right",
-            fill="y"
+
+        scroll_vertical.grid(
+            row=0,
+            column=1,
+            sticky="ns"
+        )
+
+
+        panel_tabla.grid_rowconfigure(
+            0,
+            weight=1
+        )
+
+        panel_tabla.grid_columnconfigure(
+            0,
+            weight=1
         )
 
 
@@ -491,27 +459,27 @@ class Asistencia(tk.Frame):
 
         tk.Button(
             panel_acciones,
-            text="Cambiar estado manualmente",
+            text="Cambiar estado manual",
             bg="#E5E5E5",
             fg="#202020",
             activebackground="#D5D5D5",
             relief="flat",
             bd=0,
             cursor="hand2",
-            font=("Segoe UI", 10),
+            font=("Segoe UI", 9),
             command=self.cambiar_estado_manual
         ).pack(
             side="left",
-            ipadx=15,
+            ipadx=12,
             ipady=5
         )
 
 
     def cargar_sesiones(self):
 
-        id_anterior = (
-            self.obtener_id_sesion()
-        )
+        if self.lector_activo:
+
+            self.detener_lector()
 
 
         resultados = (
@@ -539,14 +507,11 @@ class Asistencia(tk.Frame):
             return
 
 
-        self.datos_sesiones = []
-
+        sesiones = []
 
         if resultados:
 
-            self.datos_sesiones = (
-                resultados[0]
-            )
+            sesiones = resultados[0]
 
 
         valores = []
@@ -554,16 +519,27 @@ class Asistencia(tk.Frame):
         self.mapa_sesiones = {}
 
 
-        for sesion in self.datos_sesiones:
+        for sesion in sesiones:
+
+            hora_inicio = (
+                self.formatear_hora(
+                    sesion.get(
+                        "hora_inicio"
+                    )
+                )
+            )
+
 
             texto = (
                 f"{sesion['id']} - "
                 f"{sesion['curso']} - "
-                f"Sección {sesion['seccion']} - "
-                f"{self.formatear_fecha(sesion['fecha'])} "
-                f"{self.formatear_hora(sesion['hora_inicio'])} "
-                f"({sesion['estado']})"
+                f"Sección "
+                f"{sesion['seccion']} - "
+                f"{sesion['fecha']} - "
+                f"{hora_inicio} - "
+                f"{sesion['estado']}"
             )
+
 
             valores.append(
                 texto
@@ -571,7 +547,7 @@ class Asistencia(tk.Frame):
 
             self.mapa_sesiones[
                 texto
-            ] = sesion["id"]
+            ] = sesion
 
 
         self.cmb_sesion[
@@ -579,84 +555,93 @@ class Asistencia(tk.Frame):
         ] = valores
 
 
-        if not valores:
+        if valores:
+
+            self.cmb_sesion.current(
+                0
+            )
+
+            self.cargar_asistencias()
+
+        else:
 
             self.cmb_sesion.set(
                 ""
             )
 
-            self.datos_asistencias = []
+            self.limpiar_tabla()
 
-            self.mostrar_datos(
-                []
+
+    def formatear_hora(
+        self,
+        valor
+    ):
+
+        if valor is None:
+
+            return ""
+
+
+        if isinstance(
+            valor,
+            timedelta
+        ):
+
+            segundos = int(
+                valor.total_seconds()
             )
 
-            return
+            horas = (
+                segundos // 3600
+            )
+
+            minutos = (
+                segundos % 3600
+            ) // 60
 
 
-        seleccionado = False
+            return (
+                f"{horas:02d}:"
+                f"{minutos:02d}"
+            )
 
 
-        if id_anterior is not None:
+        try:
 
-            for texto, identificador in (
-                self.mapa_sesiones.items()
-            ):
+            return valor.strftime(
+                "%H:%M"
+            )
 
-                if identificador == id_anterior:
+        except AttributeError:
 
-                    self.cmb_sesion.set(
-                        texto
-                    )
-
-                    seleccionado = True
-
-                    break
+            return str(
+                valor
+            )
 
 
-        if not seleccionado:
+    def obtener_sesion_seleccionada(
+        self
+    ):
 
-            abierta = None
-
-
-            for texto in valores:
-
-                if "(ABIERTA)" in texto:
-
-                    abierta = texto
-
-                    break
+        texto = (
+            self.cmb_sesion
+            .get()
+            .strip()
+        )
 
 
-            if abierta is not None:
-
-                self.cmb_sesion.set(
-                    abierta
-                )
-
-            else:
-
-                self.cmb_sesion.current(
-                    0
-                )
-
-
-        self.cargar_asistencias()
-
-
-    def obtener_id_sesion(self):
-
-        if not hasattr(
-            self,
-            "cmb_sesion"
+        if (
+            texto == ""
+            or texto
+            not in self.mapa_sesiones
         ):
 
             return None
 
 
-        return self.mapa_sesiones.get(
-            self.cmb_sesion.get()
-        )
+        return self.mapa_sesiones[
+            texto
+        ]
 
 
     def cambiar_sesion(
@@ -664,65 +649,46 @@ class Asistencia(tk.Frame):
         event=None
     ):
 
-        self.txt_buscar.delete(
-            0,
-            tk.END
-        )
+        if self.lector_activo:
 
-        self.cmb_estado.set(
-            "TODOS"
-        )
+            self.detener_lector()
+
 
         self.cargar_asistencias()
 
 
-    def obtener_estado_sesion_actual(self):
-
-        id_sesion = (
-            self.obtener_id_sesion()
+        self.lbl_estado_sensor.config(
+            text=(
+                "Presiona Iniciar lector "
+                "para comenzar a marcar."
+            )
         )
 
 
-        if id_sesion is None:
-
-            return None
-
-
-        for sesion in self.datos_sesiones:
-
-            if sesion["id"] == id_sesion:
-
-                return sesion["estado"]
-
-
-        return None
+        self.lbl_ultimo_alumno.config(
+            text=""
+        )
 
 
     def cargar_asistencias(self):
 
-        id_sesion = (
-            self.obtener_id_sesion()
+        sesion = (
+            self.obtener_sesion_seleccionada()
         )
 
 
-        if id_sesion is None:
+        if sesion is None:
 
-            self.datos_asistencias = []
-
-            self.mostrar_datos(
-                []
-            )
+            self.limpiar_tabla()
 
             return
 
 
         resultados = (
-            self.database
-            .consultar(
+            self.database.consultar(
                 """
                 SELECT
                     id_asistencia,
-                    id_alumno,
                     codigo,
                     alumno,
                     hora_registro,
@@ -732,7 +698,7 @@ class Asistencia(tk.Frame):
                 ORDER BY alumno
                 """,
                 (
-                    id_sesion,
+                    sesion["id"],
                 )
             )
         )
@@ -740,7 +706,9 @@ class Asistencia(tk.Frame):
 
         if (
             not resultados
-            and self.database.obtener_ultimo_error()
+            and
+            self.database
+            .obtener_ultimo_error()
         ):
 
             messagebox.showerror(
@@ -758,21 +726,82 @@ class Asistencia(tk.Frame):
             return
 
 
-        self.datos_asistencias = resultados
-
-
-        self.mostrar_datos(
-            self.datos_asistencias
+        self.mostrar_asistencias(
+            resultados
         )
 
 
-    def mostrar_datos(
+    def mostrar_asistencias(
         self,
         datos
     ):
 
+        self.limpiar_tabla()
+
+
+        for registro in datos:
+
+            hora = registro.get(
+                "hora_registro"
+            )
+
+
+            if hora is None:
+
+                hora_texto = ""
+
+            else:
+
+                try:
+
+                    hora_texto = (
+                        hora.strftime(
+                            "%Y-%m-%d "
+                            "%H:%M:%S"
+                        )
+                    )
+
+                except AttributeError:
+
+                    hora_texto = str(
+                        hora
+                    )
+
+
+            self.tabla.insert(
+                "",
+                tk.END,
+                values=(
+                    registro[
+                        "id_asistencia"
+                    ],
+                    registro[
+                        "codigo"
+                    ],
+                    registro[
+                        "alumno"
+                    ],
+                    hora_texto,
+                    registro[
+                        "estado"
+                    ]
+                )
+            )
+
+
+        self.lbl_resultados.config(
+            text=(
+                "Asistencias registradas: "
+                f"{len(datos)}"
+            )
+        )
+
+
+    def limpiar_tabla(self):
+
         for fila in (
-            self.tabla.get_children()
+            self.tabla
+            .get_children()
         ):
 
             self.tabla.delete(
@@ -780,533 +809,433 @@ class Asistencia(tk.Frame):
             )
 
 
-        for asistencia in datos:
-
-            self.tabla.insert(
-                "",
-                tk.END,
-                values=(
-                    asistencia[
-                        "id_asistencia"
-                    ],
-                    asistencia[
-                        "codigo"
-                    ],
-                    asistencia[
-                        "alumno"
-                    ],
-                    self.formatear_fecha_hora(
-                        asistencia[
-                            "hora_registro"
-                        ]
-                    ),
-                    asistencia[
-                        "estado"
-                    ]
-                )
-            )
-
-
-    def formatear_fecha(
-        self,
-        fecha
-    ):
-
-        if fecha is None:
-
-            return ""
-
-
-        try:
-
-            return fecha.strftime(
-                "%Y-%m-%d"
-            )
-
-        except AttributeError:
-
-            return str(
-                fecha
-            )
-
-
-    def formatear_hora(
-        self,
-        hora
-    ):
-
-        if hora is None:
-
-            return ""
-
-
-        if hasattr(
-            hora,
-            "total_seconds"
-        ):
-
-            segundos = int(
-                hora.total_seconds()
-            )
-
-            horas = (
-                segundos // 3600
-            )
-
-            minutos = (
-                segundos % 3600
-            ) // 60
-
-            return (
-                f"{horas:02d}:"
-                f"{minutos:02d}"
-            )
-
-
-        texto = str(
-            hora
+        self.lbl_resultados.config(
+            text="Asistencias registradas: 0"
         )
 
 
-        if len(texto) >= 5:
+    def iniciar_lector(self):
 
-            return texto[:5]
+        if self.lector_activo:
 
-
-        return texto
-
-
-    def formatear_fecha_hora(
-        self,
-        fecha
-    ):
-
-        if fecha is None:
-
-            return ""
+            return
 
 
-        try:
-
-            return fecha.strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
-
-        except AttributeError:
-
-            return str(
-                fecha
-            )
-
-
-    def filtrar(
-        self,
-        event=None
-    ):
-
-        texto = (
-            self.txt_buscar
-            .get()
-            .strip()
-            .lower()
-        )
-
-        estado = (
-            self.cmb_estado
-            .get()
+        sesion = (
+            self.obtener_sesion_seleccionada()
         )
 
 
-        filtradas = []
-
-
-        for asistencia in self.datos_asistencias:
-
-            codigo = str(
-                asistencia["codigo"]
-            ).lower()
-
-            alumno = str(
-                asistencia["alumno"]
-            ).lower()
-
-
-            coincide_texto = (
-                texto == ""
-                or texto in codigo
-                or texto in alumno
-            )
-
-
-            coincide_estado = (
-                estado == "TODOS"
-                or asistencia["estado"]
-                == estado
-            )
-
-
-            if (
-                coincide_texto
-                and coincide_estado
-            ):
-
-                filtradas.append(
-                    asistencia
-                )
-
-
-        self.mostrar_datos(
-            filtradas
-        )
-
-
-    def validar_sesion_abierta(self):
-
-        id_sesion = (
-            self.obtener_id_sesion()
-        )
-
-
-        if id_sesion is None:
+        if sesion is None:
 
             messagebox.showwarning(
                 "Asistencia",
                 "Selecciona una sesión."
             )
 
-            return None
-
-
-        estado = (
-            self.obtener_estado_sesion_actual()
-        )
-
-
-        if estado != "ABIERTA":
-
-            messagebox.showwarning(
-                "Asistencia",
-                (
-                    "La sesión seleccionada "
-                    "no está abierta."
-                )
-            )
-
-            return None
-
-
-        return id_sesion
-
-
-    def registrar_por_codigo(self):
-
-        id_sesion = (
-            self.validar_sesion_abierta()
-        )
-
-
-        if id_sesion is None:
-
-            return
-
-
-        codigo = (
-            self.txt_codigo
-            .get()
-            .strip()
-        )
-
-
-        if codigo == "":
-
-            messagebox.showwarning(
-                "Asistencia",
-                (
-                    "Ingresa el código "
-                    "del alumno."
-                )
-            )
-
-            self.txt_codigo.focus_set()
-
-            return
-
-
-        resultados = (
-            self.database
-            .llamar_procedimiento(
-                "BuscarAlumnoPorCodigo",
-                (
-                    codigo,
-                )
-            )
-        )
-
-
-        if resultados is None:
-
-            messagebox.showerror(
-                "Asistencia",
-                (
-                    "No se pudo buscar "
-                    "el alumno.\n\n"
-                    + str(
-                        self.database
-                        .obtener_ultimo_error()
-                    )
-                )
-            )
-
             return
 
 
         if (
-            not resultados
-            or not resultados[0]
+            sesion["estado"]
+            != "ABIERTA"
         ):
 
             messagebox.showwarning(
                 "Asistencia",
                 (
-                    "No se encontró un alumno "
-                    "con ese código."
+                    "Solamente se puede marcar "
+                    "asistencia en una sesión "
+                    "ABIERTA."
                 )
             )
 
             return
 
 
-        alumno = resultados[0][0]
+        self.id_sesion_lector = (
+            sesion["id"]
+        )
 
 
-        self.registrar_asistencia(
-            alumno["id"],
-            (
-                f"{alumno['nombre']} "
-                f"{alumno['apellido']}"
+        self.lector_activo = True
+
+
+        self.cmb_sesion.config(
+            state="disabled"
+        )
+
+
+        self.btn_iniciar.config(
+            state="disabled"
+        )
+
+
+        self.btn_detener.config(
+            state="normal"
+        )
+
+
+        self.lbl_ultimo_alumno.config(
+            text=""
+        )
+
+
+        self.lbl_estado_sensor.config(
+            text=(
+                "Conectando con Arduino "
+                "y sensor..."
             )
         )
 
 
-        self.txt_codigo.delete(
-            0,
-            tk.END
-        )
-
-        self.txt_codigo.focus_set()
-
-
-    def registrar_por_huella(self):
-
-        id_sesion = (
-            self.validar_sesion_abierta()
+        self.hilo_lector = (
+            threading.Thread(
+                target=self.bucle_lector,
+                daemon=True
+            )
         )
 
 
-        if id_sesion is None:
-
-            return
+        self.hilo_lector.start()
 
 
-        template = (
-            self.txt_template
-            .get()
-            .strip()
-        )
+    def bucle_lector(self):
 
+        while self.lector_activo:
 
-        if template == "":
+            try:
 
-            messagebox.showwarning(
-                "Asistencia",
-                (
-                    "Ingresa el ID "
-                    "del template."
+                resultado = (
+                    self.sensor
+                    .identificar_huella(
+                        callback_estado=
+                        self.estado_sensor_hilo
+                    )
                 )
-            )
 
-            self.txt_template.focus_set()
 
-            return
+                if not self.lector_activo:
 
+                    break
+
+
+                evento = (
+                    threading.Event()
+                )
+
+
+                self.after(
+                    0,
+                    self.procesar_huella,
+                    resultado,
+                    evento
+                )
+
+
+                evento.wait()
+
+
+            except Exception as error:
+
+                if not self.lector_activo:
+
+                    break
+
+
+                mensaje = str(
+                    error
+                )
+
+
+                if (
+                    "Tiempo agotado"
+                    in mensaje
+                    or
+                    "Tiempo agotado esperando"
+                    in mensaje
+                ):
+
+                    continue
+
+
+                if (
+                    "Huella no registrada"
+                    in mensaje
+                ):
+
+                    self.after(
+                        0,
+                        self.mostrar_estado_error,
+                        "Huella no registrada."
+                    )
+
+                    continue
+
+
+                self.after(
+                    0,
+                    self.error_lector,
+                    mensaje
+                )
+
+                break
+
+
+    def estado_sensor_hilo(
+        self,
+        mensaje
+    ):
 
         try:
 
-            id_template = int(
-                template
+            self.after(
+                0,
+                self.lbl_estado_sensor.config,
+                {
+                    "text": mensaje
+                }
             )
 
-        except ValueError:
+        except tk.TclError:
 
-            messagebox.showwarning(
-                "Asistencia",
-                (
-                    "El ID del template "
-                    "debe ser un número entero."
+            pass
+
+
+    def procesar_huella(
+        self,
+        resultado_sensor,
+        evento
+    ):
+
+        try:
+
+            if not self.lector_activo:
+
+                return
+
+
+            id_template = (
+                resultado_sensor[
+                    "id_template"
+                ]
+            )
+
+
+            confianza = (
+                resultado_sensor.get(
+                    "confianza",
+                    0
                 )
             )
 
-            return
 
-
-        resultados = (
-            self.database
-            .llamar_procedimiento(
-                "BuscarAlumnoPorHuella",
-                (
-                    id_template,
-                )
-            )
-        )
-
-
-        if resultados is None:
-
-            messagebox.showerror(
-                "Asistencia",
-                (
-                    "No se pudo consultar "
-                    "la huella.\n\n"
-                    + str(
-                        self.database
-                        .obtener_ultimo_error()
+            resultado_alumno = (
+                self.database
+                .llamar_procedimiento(
+                    "BuscarAlumnoPorHuella",
+                    (
+                        id_template,
                     )
                 )
             )
 
-            return
+
+            if resultado_alumno is None:
+
+                self.mostrar_estado_error(
+                    (
+                        "Error buscando al alumno: "
+                        + str(
+                            self.database
+                            .obtener_ultimo_error()
+                        )
+                    )
+                )
+
+                return
 
 
-        if (
-            not resultados
-            or not resultados[0]
-        ):
+            alumno = None
 
-            messagebox.showwarning(
-                "Asistencia",
-                (
-                    "No existe una huella activa "
-                    "con ese template."
+
+            for conjunto in (
+                resultado_alumno
+            ):
+
+                if conjunto:
+
+                    alumno = conjunto[0]
+
+                    break
+
+
+            if alumno is None:
+
+                self.mostrar_estado_error(
+                    (
+                        "El template "
+                        f"{id_template} "
+                        "no está relacionado "
+                        "con un alumno activo."
+                    )
+                )
+
+                return
+
+
+            resultado_registro = (
+                self.database
+                .llamar_procedimiento(
+                    "RegistrarAsistencia",
+                    (
+                        alumno["id"],
+                        self.id_sesion_lector,
+                        datetime.now()
+                    )
                 )
             )
 
-            return
+
+            if resultado_registro is None:
+
+                self.mostrar_estado_error(
+                    (
+                        f"{alumno['nombre']} "
+                        f"{alumno['apellido']}: "
+                        + str(
+                            self.database
+                            .obtener_ultimo_error()
+                        )
+                    )
+                )
+
+                return
 
 
-        alumno = resultados[0][0]
-
-
-        self.registrar_asistencia(
-            alumno["id"],
-            (
+            nombre_completo = (
                 f"{alumno['nombre']} "
                 f"{alumno['apellido']}"
             )
-        )
 
 
-        self.txt_template.delete(
-            0,
-            tk.END
-        )
+            self.lbl_estado_sensor.config(
+                text=(
+                    "Asistencia registrada. "
+                    "Coloque la siguiente huella."
+                ),
+                fg="#107C10"
+            )
 
-        self.txt_template.focus_set()
+
+            self.lbl_ultimo_alumno.config(
+                text=(
+                    f"{nombre_completo} - "
+                    f"{alumno['codigo']} - "
+                    f"Template {id_template} - "
+                    f"Confianza {confianza}"
+                ),
+                fg="#107C10"
+            )
 
 
-    def registrar_asistencia(
+            self.cargar_asistencias()
+
+
+        finally:
+
+            evento.set()
+
+
+    def mostrar_estado_error(
         self,
-        id_alumno,
-        nombre_alumno
+        mensaje
     ):
 
-        id_sesion = (
-            self.obtener_id_sesion()
+        self.lbl_estado_sensor.config(
+            text=mensaje,
+            fg="#C42B1C"
         )
 
 
-        if id_sesion is None:
+    def error_lector(
+        self,
+        mensaje
+    ):
 
-            return
+        self.lector_activo = False
 
 
-        fecha_hora = (
-            datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            )
+        self.cmb_sesion.config(
+            state="readonly"
         )
 
 
-        resultado = (
-            self.database
-            .llamar_procedimiento(
-                "RegistrarAsistencia",
-                (
-                    id_alumno,
-                    id_sesion,
-                    fecha_hora
-                )
-            )
+        self.btn_iniciar.config(
+            state="normal"
         )
 
 
-        if resultado is None:
-
-            messagebox.showerror(
-                "Asistencia",
-                (
-                    "No se pudo registrar "
-                    "la asistencia.\n\n"
-                    + str(
-                        self.database
-                        .obtener_ultimo_error()
-                    )
-                )
-            )
-
-            return
-
-
-        estado = ""
-
-
-        if resultado and resultado[0]:
-
-            registro = resultado[0][0]
-
-            estado = str(
-                registro.get(
-                    "estado",
-                    ""
-                )
-            )
-
-
-        mensaje = (
-            "Asistencia registrada "
-            "correctamente.\n\n"
-            f"Alumno: {nombre_alumno}"
+        self.btn_detener.config(
+            state="disabled"
         )
 
 
-        if estado != "":
+        self.lbl_estado_sensor.config(
+            text=(
+                "Se detuvo el lector."
+            ),
+            fg="#C42B1C"
+        )
 
-            mensaje += (
-                f"\nEstado: {estado}"
-            )
 
-
-        messagebox.showinfo(
-            "Asistencia",
+        messagebox.showerror(
+            "Sensor de huella",
             mensaje
         )
 
 
-        self.cargar_asistencias()
+    def detener_lector(self):
+
+        if not self.lector_activo:
+
+            return
 
 
-    def obtener_asistencia_seleccionada(
-        self
-    ):
+        self.lector_activo = False
+
+
+        try:
+
+            self.sensor.cerrar()
+
+        except Exception:
+
+            pass
+
+
+        self.cmb_sesion.config(
+            state="readonly"
+        )
+
+
+        self.btn_iniciar.config(
+            state="normal"
+        )
+
+
+        self.btn_detener.config(
+            state="disabled"
+        )
+
+
+        self.lbl_estado_sensor.config(
+            text="Lector detenido.",
+            fg="#555555"
+        )
+
+
+    def cambiar_estado_manual(self):
 
         seleccion = (
             self.tabla.selection()
@@ -1318,41 +1247,30 @@ class Asistencia(tk.Frame):
             messagebox.showwarning(
                 "Asistencia",
                 (
-                    "Selecciona un registro "
-                    "de asistencia."
+                    "Selecciona una asistencia "
+                    "de la tabla."
                 )
             )
 
-            return None
-
-
-        valores = self.tabla.item(
-            seleccion[0],
-            "values"
-        )
-
-
-        return {
-            "id_asistencia": int(
-                valores[0]
-            ),
-            "codigo": valores[1],
-            "alumno": valores[2],
-            "hora": valores[3],
-            "estado": valores[4]
-        }
-
-
-    def cambiar_estado_manual(self):
-
-        asistencia = (
-            self.obtener_asistencia_seleccionada()
-        )
-
-
-        if asistencia is None:
-
             return
+
+
+        valores = (
+            self.tabla.item(
+                seleccion[0],
+                "values"
+            )
+        )
+
+
+        id_asistencia = int(
+            valores[0]
+        )
+
+
+        alumno = valores[2]
+
+        estado_actual = valores[4]
 
 
         ventana = tk.Toplevel(
@@ -1360,11 +1278,11 @@ class Asistencia(tk.Frame):
         )
 
         ventana.title(
-            "Cambiar asistencia"
+            "Cambiar estado"
         )
 
         ventana.geometry(
-            "440x330"
+            "420x300"
         )
 
         ventana.resizable(
@@ -1379,86 +1297,120 @@ class Asistencia(tk.Frame):
         ventana.grab_set()
 
 
-        tk.Label(
+        contenedor = tk.Frame(
             ventana,
-            text="Cambiar asistencia",
-            font=("Segoe UI", 15, "bold")
-        ).pack(
-            pady=(20, 5)
+            bg="#FFFFFF"
+        )
+
+        contenedor.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=20
         )
 
 
         tk.Label(
-            ventana,
-            text=(
-                f"{asistencia['codigo']} - "
-                f"{asistencia['alumno']}"
-            ),
-            font=("Segoe UI", 10)
+            contenedor,
+            text="Cambiar estado manual",
+            bg="#FFFFFF",
+            fg="#202020",
+            font=(
+                "Segoe UI",
+                15,
+                "bold"
+            )
         ).pack(
-            pady=(0, 15)
+            anchor="w"
         )
 
 
         tk.Label(
-            ventana,
+            contenedor,
+            text=alumno,
+            bg="#FFFFFF",
+            fg="#555555",
+            font=(
+                "Segoe UI",
+                10
+            )
+        ).pack(
+            anchor="w",
+            pady=(5, 15)
+        )
+
+
+        tk.Label(
+            contenedor,
             text="Nuevo estado",
+            bg="#FFFFFF",
+            fg="#202020",
             font=("Segoe UI", 9)
-        ).pack()
+        ).pack(
+            anchor="w"
+        )
 
 
-        cmb_nuevo_estado = ttk.Combobox(
-            ventana,
+        cmb_estado = ttk.Combobox(
+            contenedor,
             state="readonly",
             values=(
                 "PRESENTE",
                 "TARDE",
                 "AUSENTE",
                 "FUERA_TIEMPO"
-            ),
-            width=25
-        )
-
-        cmb_nuevo_estado.set(
-            asistencia["estado"]
-            if asistencia["estado"]
-            in (
-                "PRESENTE",
-                "TARDE",
-                "AUSENTE",
-                "FUERA_TIEMPO"
             )
-            else ""
         )
 
-        cmb_nuevo_estado.pack(
-            pady=(5, 15)
+        cmb_estado.pack(
+            fill="x",
+            pady=(5, 12)
         )
+
+
+        if estado_actual in (
+            "PRESENTE",
+            "TARDE",
+            "AUSENTE",
+            "FUERA_TIEMPO"
+        ):
+
+            cmb_estado.set(
+                estado_actual
+            )
 
 
         tk.Label(
-            ventana,
-            text="Motivo del cambio",
+            contenedor,
+            text="Motivo",
+            bg="#FFFFFF",
+            fg="#202020",
             font=("Segoe UI", 9)
-        ).pack()
+        ).pack(
+            anchor="w"
+        )
 
 
-        txt_motivo = tk.Text(
-            ventana,
-            height=4,
-            width=45,
-            font=("Segoe UI", 9)
+        txt_motivo = ttk.Entry(
+            contenedor
         )
 
         txt_motivo.pack(
+            fill="x",
             pady=(5, 15)
         )
 
 
-        def guardar_cambio():
+        def guardar():
 
             nuevo_estado = (
-                cmb_nuevo_estado
+                cmb_estado
+                .get()
+                .strip()
+            )
+
+            motivo = (
+                txt_motivo
                 .get()
                 .strip()
             )
@@ -1468,34 +1420,18 @@ class Asistencia(tk.Frame):
 
                 messagebox.showwarning(
                     "Asistencia",
-                    (
-                        "Selecciona el "
-                        "nuevo estado."
-                    ),
+                    "Selecciona un estado.",
                     parent=ventana
                 )
 
                 return
 
 
-            motivo = (
-                txt_motivo
-                .get(
-                    "1.0",
-                    tk.END
-                )
-                .strip()
-            )
-
-
             if motivo == "":
 
                 messagebox.showwarning(
                     "Asistencia",
-                    (
-                        "Debes indicar el motivo "
-                        "del cambio."
-                    ),
+                    "Escribe el motivo.",
                     parent=ventana
                 )
 
@@ -1507,9 +1443,7 @@ class Asistencia(tk.Frame):
                 .llamar_procedimiento(
                     "CambiarAsistenciaManual",
                     (
-                        asistencia[
-                            "id_asistencia"
-                        ],
+                        id_asistencia,
                         nuevo_estado,
                         motivo
                     )
@@ -1522,7 +1456,7 @@ class Asistencia(tk.Frame):
                 messagebox.showerror(
                     "Asistencia",
                     (
-                        "No se pudo modificar "
+                        "No se pudo cambiar "
                         "la asistencia.\n\n"
                         + str(
                             self.database
@@ -1535,23 +1469,22 @@ class Asistencia(tk.Frame):
                 return
 
 
-            messagebox.showinfo(
-                "Asistencia",
-                (
-                    "Asistencia modificada "
-                    "correctamente."
-                ),
-                parent=ventana
-            )
-
-
             ventana.destroy()
 
             self.cargar_asistencias()
 
 
+            messagebox.showinfo(
+                "Asistencia",
+                (
+                    "Estado actualizado "
+                    "correctamente."
+                )
+            )
+
+
         tk.Button(
-            ventana,
+            contenedor,
             text="Guardar cambio",
             bg="#0078D4",
             fg="#FFFFFF",
@@ -1560,14 +1493,30 @@ class Asistencia(tk.Frame):
             relief="flat",
             bd=0,
             cursor="hand2",
-            font=("Segoe UI", 10, "bold"),
-            command=guardar_cambio
+            font=(
+                "Segoe UI",
+                10,
+                "bold"
+            ),
+            command=guardar
         ).pack(
-            ipadx=20,
-            ipady=5
+            fill="x",
+            ipady=6
         )
 
 
-    def actualizar(self):
+    def destroy(self):
 
-        self.cargar_sesiones()
+        self.lector_activo = False
+
+
+        try:
+
+            self.sensor.cerrar()
+
+        except Exception:
+
+            pass
+
+
+        super().destroy()
